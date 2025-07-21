@@ -178,7 +178,7 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&#39;/g, "'")
 }
 
-function generateGuidHash(title: string, publishedAt: string): string {
+export function generateGuidHash(title: string, publishedAt: string): string {
   // Simple hash function for generating GUIDs when not provided
   const str = `${title}-${publishedAt}`
   let hash = 0
