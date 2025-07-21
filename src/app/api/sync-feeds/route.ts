@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { parseFeed, generateGuidHash } from '@/lib/services/feed-parser'
+import { parseFeed, generateGuidHash } from '@/lib/services/feed-parser-server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,7 +76,9 @@ export async function POST(request: NextRequest) {
         console.log(`Syncing feed: ${subscription.title} (${subscription.feed_url})`)
         
         // Parse the RSS/Atom feed
-        const parsedFeed = await parseFeed(subscription.feed_url)
+        // For cron jobs, we need to provide the base URL
+        const baseUrl = isCronJob ? process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' : undefined
+        const parsedFeed = await parseFeed(subscription.feed_url, baseUrl)
         
         let syncedEntries = 0
         

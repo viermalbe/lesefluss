@@ -1,4 +1,5 @@
 // RSS/Atom feed parsing service
+import { XMLParser } from 'fast-xml-parser'
 
 export interface FeedEntry {
   guid: string
@@ -16,10 +17,15 @@ export interface ParsedFeed {
   last_updated: string
 }
 
-export async function parseFeed(feedUrl: string): Promise<ParsedFeed> {
+export async function parseFeed(feedUrl: string, baseUrl?: string): Promise<ParsedFeed> {
   try {
     // Use proxy API to avoid CORS issues
-    const response = await fetch('/api/fetch-feed', {
+    // In cron job context, we need absolute URL
+    const apiUrl = baseUrl 
+      ? `${baseUrl}/api/fetch-feed`
+      : '/api/fetch-feed'
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -34,20 +40,25 @@ export async function parseFeed(feedUrl: string): Promise<ParsedFeed> {
     
     const { content: feedText } = await response.json()
     
-    // Parse XML using DOMParser
-    const parser = new DOMParser()
-    const xmlDoc = parser.parseFromString(feedText, 'text/xml')
+    // Parse XML using fast-xml-parser (server-compatible)
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '@_',
+      textNodeName: '#text',
+      parseAttributeValue: true,
+      trimValues: true
+    })
     
-    // Check for parsing errors
-    const parseError = xmlDoc.querySelector('parsererror')
-    if (parseError) {
+    let xmlDoc
+    try {
+      xmlDoc = parser.parse(feedText)
+    } catch (error) {
       throw new Error('Invalid XML format')
     }
     
-    // Detect feed type (Atom or RSS) with debug logging
-    const feedElement = xmlDoc.querySelector('feed')
-    const rssElement = xmlDoc.querySelector('rss')
-    const channelElement = xmlDoc.querySelector('channel')
+    // Detect feed type (Atom or RSS)
+    const isAtom = xmlDoc.feed !== undefined
+    const isRss = xmlDoc.rss !== undefined
     
     console.log('Feed detection:', {
       hasFeedElement: !!feedElement,
