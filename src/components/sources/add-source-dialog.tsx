@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
-import { Loader2, Plus } from 'lucide-react'
+import { Loader2, Plus, ExternalLink, Copy, CheckCircle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -27,11 +27,16 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase/client'
 
 const addSourceSchema = z.object({
   title: z.string().min(1, 'Please enter a title for this source').max(255, 'Title is too long'),
+  ktlnEmail: z.string().email('Please enter a valid email address').refine(
+    (email) => email.endsWith('@kill-the-newsletter.com'),
+    'Please enter a Kill The Newsletter email address'
+  ),
 })
 
 type AddSourceFormData = z.infer<typeof addSourceSchema>
@@ -44,14 +49,22 @@ interface AddSourceDialogProps {
 export function AddSourceDialog({ children, onSuccess }: AddSourceDialogProps) {
   const [open, setOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+
   const router = useRouter()
   
   const form = useForm<AddSourceFormData>({
     resolver: zodResolver(addSourceSchema),
     defaultValues: {
       title: '',
+      ktlnEmail: '',
     },
   })
+
+  // Generate feed URL from email address
+  const generateFeedUrl = (email: string): string => {
+    const emailId = email.split('@')[0]
+    return `https://kill-the-newsletter.com/feeds/${emailId}.xml`
+  }
 
   const createSubscription = async (data: AddSourceFormData) => {
     setIsCreating(true)
@@ -64,13 +77,8 @@ export function AddSourceDialog({ children, onSuccess }: AddSourceDialogProps) {
         throw new Error('User not authenticated')
       }
       
-      // Create mock KTLN subscription for testing
-      console.log('Creating mock newsletter for:', data.title)
-      const mockId = Math.random().toString(36).substring(2, 15)
-      const ktlnResult = {
-        email: `${mockId}@kill-the-newsletter.com`,
-        feed: `https://kill-the-newsletter.com/feeds/${mockId}.xml`
-      }
+      // Generate feed URL from email
+      const feedUrl = generateFeedUrl(data.ktlnEmail)
       
       // Insert subscription into database
       const { data: subscription, error } = await supabase
@@ -78,8 +86,8 @@ export function AddSourceDialog({ children, onSuccess }: AddSourceDialogProps) {
         .insert({
           user_id: user.id,
           title: data.title,
-          feed_url: ktlnResult.feed,
-          ktln_email: ktlnResult.email,
+          feed_url: feedUrl,
+          ktln_email: data.ktlnEmail,
           status: 'active' as const,
         })
         .select()
@@ -102,6 +110,8 @@ export function AddSourceDialog({ children, onSuccess }: AddSourceDialogProps) {
     }
   }
 
+
+
   const onSubmit = (data: AddSourceFormData) => {
     createSubscription(data)
   }
@@ -120,8 +130,7 @@ export function AddSourceDialog({ children, onSuccess }: AddSourceDialogProps) {
         <DialogHeader>
           <DialogTitle>Add New Source</DialogTitle>
           <DialogDescription>
-            Add a newsletter to your reading list. We'll create a unique email address 
-            that converts newsletters into RSS feeds automatically using Kill-The-Newsletter.com.
+            Add a newsletter to your reading list using Kill-The-Newsletter.com
           </DialogDescription>
         </DialogHeader>
         
@@ -140,7 +149,43 @@ export function AddSourceDialog({ children, onSuccess }: AddSourceDialogProps) {
                     />
                   </FormControl>
                   <FormDescription>
-                    Give this newsletter a memorable title (e.g., "TechCrunch Newsletter")
+                    Give this newsletter a memorable title
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <div className="space-y-2">
+              <FormLabel>Create Newsletter Feed</FormLabel>
+              <Button 
+                type="button"
+                variant="outline" 
+                className="w-full justify-between"
+                onClick={() => window.open('https://kill-the-newsletter.com', '_blank')}
+              >
+                Open Kill The Newsletter
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+              <FormDescription>
+                Create a newsletter feed and copy the email address
+              </FormDescription>
+            </div>
+            
+            <FormField
+              control={form.control}
+              name="ktlnEmail"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Newsletter Email</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="xxxxx@kill-the-newsletter.com" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Paste the email address from Kill The Newsletter (feed URL will be generated automatically)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

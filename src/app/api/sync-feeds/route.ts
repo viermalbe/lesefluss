@@ -9,21 +9,28 @@ export async function POST(request: NextRequest) {
     
     // Check if this is a cron job call (has service role authorization)
     const authHeader = request.headers.get('authorization')
-    const isCronJob = authHeader?.includes('Bearer') && 
-                     authHeader.includes(process.env.SUPABASE_SERVICE_ROLE_KEY || '')
+    console.log('Authorization header:', authHeader ? `Bearer ${authHeader.substring(0, 20)}...` : 'None')
+    console.log('Service role key available:', !!process.env.SUPABASE_SERVICE_ROLE_KEY)
+    
+    // Check if the authorization header contains the service role key
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const isCronJob = authHeader && serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`
+    
+    console.log('Is cron job:', isCronJob)
     
     let supabase
     let targetUserId: string | null = null
     
     if (isCronJob) {
       // Use service role client for cron jobs
-      console.log('Cron job detected - using service role')
+      console.log('✅ Cron job detected - using service role')
       supabase = createServiceClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       )
     } else {
       // Use regular client for user requests
+      console.log('👤 User request - using regular client')
       supabase = await createClient()
       
       // Get current user
@@ -38,9 +45,13 @@ export async function POST(request: NextRequest) {
       }
       
       targetUserId = user.id
+      console.log('User ID:', targetUserId)
     }
     
     // Get all active subscriptions (for specific user or all users in cron mode)
+    console.log('📋 Fetching subscriptions...')
+    console.log('Target user ID:', targetUserId || 'ALL USERS (cron mode)')
+    
     const subscriptionsQuery = supabase
       .from('subscriptions')
       .select('*')
@@ -52,20 +63,29 @@ export async function POST(request: NextRequest) {
     
     const { data: subscriptions, error: subscriptionsError } = await subscriptionsQuery
     
+    console.log('Subscriptions query result:', {
+      count: subscriptions?.length || 0,
+      error: subscriptionsError
+    })
+    
     if (subscriptionsError) {
-      console.error('Error fetching subscriptions:', subscriptionsError)
+      console.error('❌ Error fetching subscriptions:', subscriptionsError)
       return NextResponse.json(
-        { error: 'Failed to fetch subscriptions' },
+        { error: 'Failed to fetch subscriptions', details: subscriptionsError },
         { status: 500 }
       )
     }
     
     if (!subscriptions || subscriptions.length === 0) {
+      console.log('⚠️ No active subscriptions found')
       return NextResponse.json({
         message: 'No active subscriptions found',
-        synced: 0
+        synced: 0,
+        subscriptions_processed: 0
       })
     }
+    
+    console.log(`📊 Found ${subscriptions.length} active subscriptions`)
     
     let totalSynced = 0
     const results = []
@@ -155,9 +175,12 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    console.log(`✅ Sync completed: ${totalSynced} entries across ${subscriptions.length} subscriptions`)
+    
     return NextResponse.json({
       message: `Sync completed. ${totalSynced} new entries synced.`,
       total_synced: totalSynced,
+      subscriptions_processed: subscriptions.length,
       results
     })
     
