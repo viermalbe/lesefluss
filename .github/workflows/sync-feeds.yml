@@ -1,0 +1,73 @@
+name: 🔄 Automatic Feed Sync
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      force_sync:
+        description: 'Force sync all feeds'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  sync-feeds:
+    name: Sync Newsletter Feeds
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📡 Sync Feeds
+        run: |
+          echo "🚀 Starting feed sync..."
+          
+          # Call the sync API endpoint
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "${{ secrets.APP_URL }}/api/sync-feeds" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            --max-time 300)
+          
+          # Extract HTTP status code
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n -1)
+          
+          echo "📊 Response Status: $http_code"
+          echo "📄 Response Body: $body"
+          
+          # Check if successful
+          if [ "$http_code" -eq 200 ]; then
+            echo "✅ Feed sync completed successfully!"
+            
+            # Parse and display results
+            echo "$body" | jq -r '
+              if .total_synced then
+                "🎯 Total entries synced: " + (.total_synced | tostring) + 
+                " across " + (.subscriptions_processed | tostring) + " subscriptions"
+              else
+                "📝 " + .message
+              end
+            ' 2>/dev/null || echo "📝 $body"
+            
+          else
+            echo "❌ Feed sync failed with status $http_code"
+            echo "Error: $body"
+            exit 1
+          fi
+
+      - name: 📈 Log Sync Stats
+        if: success()
+        run: |
+          echo "📊 Sync completed at $(date)"
+          echo "⏰ Next sync scheduled in 30 minutes"
+
+      - name: 🚨 Notify on Failure
+        if: failure()
+        run: |
+          echo "🚨 Feed sync failed at $(date)"
+          echo "🔍 Check the logs above for details"
+          echo "🔧 Verify APP_URL and SUPABASE_SERVICE_ROLE_KEY secrets"
