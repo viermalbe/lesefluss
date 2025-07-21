@@ -1,4 +1,4 @@
-// RSS/Atom feed parsing service
+// Server-compatible RSS/Atom feed parsing service
 import { XMLParser } from 'fast-xml-parser'
 
 export interface FeedEntry {
@@ -60,19 +60,8 @@ export async function parseFeed(feedUrl: string, baseUrl?: string): Promise<Pars
     const isAtom = xmlDoc.feed !== undefined
     const isRss = xmlDoc.rss !== undefined
     
-    console.log('Feed detection:', {
-      hasFeedElement: !!feedElement,
-      hasRssElement: !!rssElement,
-      hasChannelElement: !!channelElement,
-      feedNamespace: feedElement?.getAttribute('xmlns'),
-      rootElementName: xmlDoc.documentElement?.tagName
-    })
-    
-    const isAtom = feedElement !== null
-    const isRss = rssElement !== null || channelElement !== null
-    
     if (!isAtom && !isRss) {
-      console.error('Unsupported feed format. XML content:', feedText.substring(0, 500))
+      console.error('Unsupported feed format. Root elements:', Object.keys(xmlDoc))
       throw new Error('Unsupported feed format')
     }
     
@@ -88,120 +77,115 @@ export async function parseFeed(feedUrl: string, baseUrl?: string): Promise<Pars
   }
 }
 
-function parseAtomFeed(xmlDoc: Document): ParsedFeed {
-  const feed = xmlDoc.querySelector('feed')
+function parseAtomFeed(xmlDoc: any): ParsedFeed {
+  const feed = xmlDoc.feed
   if (!feed) throw new Error('Invalid Atom feed')
   
-  const title = feed.querySelector('title')?.textContent || 'Untitled Feed'
-  const updated = feed.querySelector('updated')?.textContent || new Date().toISOString()
+  const title = feed.title?.['#text'] || feed.title || 'Untitled Feed'
+  const updated = feed.updated?.['#text'] || feed.updated || new Date().toISOString()
   
   const entries: FeedEntry[] = []
-  const entryElements = feed.querySelectorAll('entry')
+  const entryElements = Array.isArray(feed.entry) ? feed.entry : [feed.entry].filter(Boolean)
   
-  entryElements.forEach(entry => {
-    const id = entry.querySelector('id')?.textContent
-    const entryTitle = entry.querySelector('title')?.textContent || 'Untitled'
+  for (const entry of entryElements) {
+    if (!entry) continue
     
-    // Extract content - handle both text and HTML content
-    const contentElement = entry.querySelector('content')
-    const summaryElement = entry.querySelector('summary')
+    const entryTitle = entry.title?.['#text'] || entry.title || 'Untitled'
+    const entryId = entry.id?.['#text'] || entry.id || ''
+    const published = entry.published?.['#text'] || entry.published || entry.updated?.['#text'] || entry.updated || new Date().toISOString()
+    const link = entry.link?.['@_href'] || (Array.isArray(entry.link) ? entry.link[0]?.['@_href'] : '') || ''
+    const author = entry.author?.name?.['#text'] || entry.author?.name || entry.author?.['#text'] || entry.author || ''
+    
+    // Get content
     let content = ''
-    
-    if (contentElement) {
-      // Check if content type is HTML
-      const contentType = contentElement.getAttribute('type')
-      if (contentType === 'html' || contentType === 'xhtml') {
-        content = contentElement.textContent || contentElement.innerHTML || ''
-      } else {
-        content = contentElement.textContent || ''
-      }
-    } else if (summaryElement) {
-      content = summaryElement.textContent || summaryElement.innerHTML || ''
+    if (entry.content) {
+      content = entry.content?.['#text'] || entry.content || ''
+    } else if (entry.summary) {
+      content = entry.summary?.['#text'] || entry.summary || ''
     }
     
-    const published = entry.querySelector('published')?.textContent || 
-                     entry.querySelector('updated')?.textContent || 
-                     new Date().toISOString()
-    const link = entry.querySelector('link[rel="alternate"]')?.getAttribute('href') ||
-                entry.querySelector('link')?.getAttribute('href') || undefined
-    const author = entry.querySelector('author name')?.textContent ||
-                  entry.querySelector('author email')?.textContent || undefined
-    
-    if (id) {
-      entries.push({
-        guid: id,
-        title: entryTitle,
-        content: decodeHtmlEntities(content),
-        published_at: published,
-        link,
-        author
-      })
-    }
-  })
+    entries.push({
+      guid: entryId || generateGuidHash(entryTitle, published),
+      title: decodeHtmlEntities(entryTitle),
+      content: decodeHtmlEntities(content),
+      published_at: new Date(published).toISOString(),
+      link: link,
+      author: author
+    })
+  }
   
   return {
-    title,
+    title: decodeHtmlEntities(title),
+    description: feed.subtitle?.['#text'] || feed.subtitle || '',
     entries,
-    last_updated: updated
+    last_updated: new Date(updated).toISOString()
   }
 }
 
-function parseRssFeed(xmlDoc: Document): ParsedFeed {
-  const channel = xmlDoc.querySelector('channel')
+function parseRssFeed(xmlDoc: any): ParsedFeed {
+  const channel = xmlDoc.rss?.channel
   if (!channel) throw new Error('Invalid RSS feed')
   
-  const title = channel.querySelector('title')?.textContent || 'Untitled Feed'
-  const description = channel.querySelector('description')?.textContent
-  const lastBuildDate = channel.querySelector('lastBuildDate')?.textContent || new Date().toISOString()
+  const title = channel.title?.['#text'] || channel.title || 'Untitled Feed'
+  const description = channel.description?.['#text'] || channel.description || ''
+  const lastBuildDate = channel.lastBuildDate?.['#text'] || channel.lastBuildDate || new Date().toISOString()
   
   const entries: FeedEntry[] = []
-  const itemElements = channel.querySelectorAll('item')
+  const itemElements = Array.isArray(channel.item) ? channel.item : [channel.item].filter(Boolean)
   
-  itemElements.forEach(item => {
-    const guid = item.querySelector('guid')?.textContent
-    const itemTitle = item.querySelector('title')?.textContent || 'Untitled'
-    const content = item.querySelector('description')?.textContent || 
-                   item.querySelector('content:encoded')?.textContent || ''
-    const pubDate = item.querySelector('pubDate')?.textContent || new Date().toISOString()
-    const link = item.querySelector('link')?.textContent || undefined
-    const author = item.querySelector('author')?.textContent ||
-                  item.querySelector('dc:creator')?.textContent || undefined
+  for (const item of itemElements) {
+    if (!item) continue
     
-    // Generate GUID if not present
-    const entryGuid = guid || generateGuidHash(itemTitle, pubDate)
+    const itemTitle = item.title?.['#text'] || item.title || 'Untitled'
+    const itemGuid = item.guid?.['#text'] || item.guid || ''
+    const pubDate = item.pubDate?.['#text'] || item.pubDate || new Date().toISOString()
+    const link = item.link?.['#text'] || item.link || ''
+    const author = item.author?.['#text'] || item.author || item['dc:creator']?.['#text'] || item['dc:creator'] || ''
+    
+    // Get content - try description first, then content:encoded
+    let content = ''
+    if (item['content:encoded']) {
+      content = item['content:encoded']['#text'] || item['content:encoded'] || ''
+    } else if (item.description) {
+      content = item.description?.['#text'] || item.description || ''
+    }
     
     entries.push({
-      guid: entryGuid,
-      title: itemTitle,
+      guid: itemGuid || generateGuidHash(itemTitle, pubDate),
+      title: decodeHtmlEntities(itemTitle),
       content: decodeHtmlEntities(content),
-      published_at: pubDate,
-      link,
-      author
+      published_at: new Date(pubDate).toISOString(),
+      link: link,
+      author: author
     })
-  })
+  }
   
   return {
-    title,
-    description,
+    title: decodeHtmlEntities(title),
+    description: decodeHtmlEntities(description),
     entries,
-    last_updated: lastBuildDate
+    last_updated: new Date(lastBuildDate).toISOString()
   }
 }
 
 function decodeHtmlEntities(text: string): string {
-  const textarea = document.createElement('textarea')
-  textarea.innerHTML = text
-  return textarea.value
+  if (!text) return ''
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
 }
 
-export function generateGuidHash(title: string, publishedAt: string): string {
-  // Simple hash function for GUID generation
-  const combined = `${title}-${publishedAt}`
+function generateGuidHash(title: string, publishedAt: string): string {
+  // Simple hash function for generating GUIDs when not provided
+  const str = `${title}-${publishedAt}`
   let hash = 0
-  for (let i = 0; i < combined.length; i++) {
-    const char = combined.charCodeAt(i)
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
     hash = ((hash << 5) - hash) + char
     hash = hash & hash // Convert to 32-bit integer
   }
-  return hash.toString(36)
+  return Math.abs(hash).toString(36)
 }
