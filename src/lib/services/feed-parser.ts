@@ -19,26 +19,45 @@ export interface ParsedFeed {
 
 export async function parseFeed(feedUrl: string, baseUrl?: string): Promise<ParsedFeed> {
   try {
-    // Use proxy API to avoid CORS issues
-    // In cron job context, we need absolute URL
-    const apiUrl = baseUrl 
-      ? `${baseUrl}/api/fetch-feed`
-      : '/api/fetch-feed'
+    let feedText: string
     
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ feedUrl }),
-    })
-    
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || `Failed to fetch feed: ${response.status}`)
+    if (baseUrl) {
+      // Cron job context: fetch feed directly to avoid self-referencing API calls
+      console.log(`🔗 Direct fetch: ${feedUrl}`)
+      const response = await fetch(feedUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; Lesefluss/1.0; +https://lesefluss.app/bot)',
+          'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+          'Cache-Control': 'no-cache'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      feedText = await response.text()
+      console.log(`✅ Direct fetch successful, length: ${feedText.length}`)
+    } else {
+      // Browser context: use proxy API to avoid CORS issues
+      console.log(`🔄 Proxy fetch: ${feedUrl}`)
+      const response = await fetch('/api/fetch-feed', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ feedUrl }),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Failed to fetch feed: ${response.status}`)
+      }
+      
+      const { content } = await response.json()
+      feedText = content
+      console.log(`✅ Proxy fetch successful, length: ${feedText.length}`)
     }
-    
-    const { content: feedText } = await response.json()
     
     // Parse XML using fast-xml-parser (server-compatible)
     const parser = new XMLParser({

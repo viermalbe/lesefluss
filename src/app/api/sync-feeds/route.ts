@@ -93,11 +93,20 @@ export async function POST(request: NextRequest) {
     // Process each subscription
     for (const subscription of subscriptions) {
       try {
-        console.log(`Syncing feed: ${subscription.title} (${subscription.feed_url})`)
+        console.log(`📰 Syncing feed: ${subscription.title}`)
+        console.log(`🔗 Feed URL: ${subscription.feed_url}`)
+        console.log(`📧 KTLN Email: ${subscription.ktln_email}`)
+        
+        // Validate feed URL format
+        if (!subscription.feed_url || !subscription.feed_url.startsWith('http')) {
+          throw new Error(`Invalid feed URL: ${subscription.feed_url}`)
+        }
         
         // Parse the RSS/Atom feed
         // For cron jobs, we need to provide the base URL
-        const baseUrl = isCronJob ? process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' : undefined
+        const baseUrl = isCronJob ? (process.env.APP_URL || 'https://lesefluss.vercel.app') : undefined
+        console.log(`🌐 Using base URL: ${baseUrl || 'relative'}`)
+        
         const parsedFeed = await parseFeed(subscription.feed_url, baseUrl)
         
         let syncedEntries = 0
@@ -157,20 +166,28 @@ export async function POST(request: NextRequest) {
         console.log(`Synced ${syncedEntries} new entries for ${subscription.title}`)
         
       } catch (error: any) {
-        console.error(`Error syncing ${subscription.title}:`, error)
+        console.error(`❌ Error syncing ${subscription.title}:`, error)
+        console.error(`🔗 Failed URL: ${subscription.feed_url}`)
+        
+        // Check if it's a KTLN feed that might not exist yet
+        const isKTLNFeed = subscription.feed_url?.includes('kill-the-newsletter.com')
+        const errorMessage = isKTLNFeed 
+          ? `KTLN feed not accessible (${error.message}). Feed might not have received any emails yet.`
+          : error.message
         
         // Update subscription with error
         await supabase
           .from('subscriptions')
           .update({
             last_sync_at: new Date().toISOString(),
-            sync_error: error.message
+            sync_error: errorMessage
           })
           .eq('id', subscription.id)
         
         results.push({
           subscription: subscription.title,
-          error: error.message
+          feed_url: subscription.feed_url,
+          error: errorMessage
         })
       }
     }
