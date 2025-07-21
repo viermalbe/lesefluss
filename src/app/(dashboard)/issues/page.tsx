@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/hooks'
 import { supabase } from '@/lib/supabase/client'
@@ -13,7 +13,7 @@ import { EnhancedEntryCard } from '@/components/issues/enhanced-entry-card'
 import { BookOpen, Search, Filter } from 'lucide-react'
 import Link from 'next/link'
 
-export default function IssuesPage() {
+function IssuesPageContent() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -265,5 +265,13 @@ export default function IssuesPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function IssuesPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="text-lg">Loading...</div></div>}>
+      <IssuesPageContent />
+    </Suspense>
   )
 }
