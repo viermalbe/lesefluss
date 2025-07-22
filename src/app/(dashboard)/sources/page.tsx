@@ -293,6 +293,12 @@ export default function SourcesPage() {
             <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Syncing...' : 'Sync Feeds'}
           </Button>
+          <AddSourceDialog onSuccess={loadSubscriptions}>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Source
+            </Button>
+          </AddSourceDialog>
         </div>
       </div>
       
@@ -316,14 +322,7 @@ export default function SourcesPage() {
         </div>
       ) : (
         <>
-          <div className="flex justify-end mb-4">
-            <AddSourceDialog onSuccess={loadSubscriptions}>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Source
-              </Button>
-            </AddSourceDialog>
-          </div>
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {subscriptions.map((subscription) => (
               <SourceCard

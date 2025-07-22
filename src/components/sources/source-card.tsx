@@ -180,11 +180,13 @@ export function SourceCard({ subscription, issueCount = 0, onUpdate, onDelete }:
             {/* Cover Image - Not clickable anymore */}
             <div className="flex-shrink-0">
               {subscription.image_url ? (
-                <img 
-                  src={subscription.image_url} 
-                  alt={subscription.title}
-                  className="w-16 h-16 object-cover rounded-lg  hover:shadow-md transition-shadow"
-                />
+                <div className="w-16 h-16 bg-white rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+                  <img 
+                    src={subscription.image_url} 
+                    alt={subscription.title}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
               ) : (
                 <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg border flex items-center justify-center hover:shadow-md transition-shadow">
                   <ImageIcon className="h-8 w-8 text-gray-400" />

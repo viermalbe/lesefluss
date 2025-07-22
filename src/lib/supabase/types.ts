@@ -41,6 +41,7 @@ export type Database = {
           feed_url: string
           ktln_email: string
           status: 'active' | 'paused' | 'error'
+          image_url: string | null
           last_sync_at: string | null
           sync_error: string | null
           created_at: string
@@ -53,6 +54,7 @@ export type Database = {
           feed_url: string
           ktln_email: string
           status?: 'active' | 'paused' | 'error'
+          image_url?: string | null
           last_sync_at?: string | null
           sync_error?: string | null
           created_at?: string
@@ -65,6 +67,7 @@ export type Database = {
           feed_url?: string
           ktln_email?: string
           status?: 'active' | 'paused' | 'error'
+          image_url?: string | null
           last_sync_at?: string | null
           sync_error?: string | null
           created_at?: string

@@ -2,8 +2,9 @@ name: 🔄 Automatic Feed Sync
 
 on:
   schedule:
-    # Run every 30 minutes
-    - cron: '*/30 * * * *'
+    # Run every 2 hours during day, every 4 hours at night (cost-optimized)
+    - cron: '0 6-22/2 * * *'  # Every 2 hours from 6 AM to 10 PM
+    - cron: '0 2 * * *'       # Once at 2 AM
   
   # Allow manual triggering
   workflow_dispatch:

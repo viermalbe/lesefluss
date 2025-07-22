@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/hooks'
+import { useSmartSync } from '@/lib/hooks/useSmartSync'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -10,11 +11,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { EnhancedEntryCard } from '@/components/issues/enhanced-entry-card'
-import { BookOpen, Search, Filter } from 'lucide-react'
+import { BookOpen, Search, Filter, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 
 function IssuesPageContent() {
   const { user, loading } = useAuth()
+  const { isLoading: syncLoading, canSync, triggerSync, autoSyncIfNeeded, getTimeUntilNextSync } = useSmartSync()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
@@ -78,11 +80,11 @@ function IssuesPageContent() {
             id,
             title,
             user_id,
-            status,
-            image_url
+            status
           )
         `)
         .eq('subscription.user_id', user.id)
+        .eq('archived', false)
         .order('published_at', { ascending: false })
       
       // Status filter will be applied client-side for simplicity
@@ -133,6 +135,14 @@ function IssuesPageContent() {
         ? { ...entry, starred: !currentStarred }
         : entry
     ))
+  }
+
+  // Toggle archived status
+  const toggleArchived = (entryId: string, currentArchived: boolean) => {
+    // Remove from local state immediately when archived
+    if (!currentArchived) {
+      setEntries(entries.filter(entry => entry.id !== entryId))
+    }
   }
 
   // Auth guard effect
@@ -225,7 +235,7 @@ function IssuesPageContent() {
               <SelectItem value="all">All Issues</SelectItem>
               <SelectItem value="unread">New</SelectItem>
               <SelectItem value="favorites">Liked</SelectItem>
-              <SelectItem value="read">Read</SelectItem>
+              <SelectItem value="read">Opened</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -260,6 +270,7 @@ function IssuesPageContent() {
               entry={entry}
               onToggleReadStatus={toggleReadStatus}
               onToggleStarred={toggleStarredStatus}
+              onToggleArchived={toggleArchived}
             />
           ))}
         </div>

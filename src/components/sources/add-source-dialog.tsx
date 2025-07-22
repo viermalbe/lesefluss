@@ -37,6 +37,7 @@ const addSourceSchema = z.object({
     (email) => email.endsWith('@kill-the-newsletter.com'),
     'Please enter a Kill The Newsletter email address'
   ),
+  imageUrl: z.string().url('Please enter a valid image URL').optional().or(z.literal('')),
 })
 
 type AddSourceFormData = z.infer<typeof addSourceSchema>
@@ -88,6 +89,7 @@ export function AddSourceDialog({ children, onSuccess }: AddSourceDialogProps) {
           title: data.title,
           feed_url: feedUrl,
           ktln_email: data.ktlnEmail,
+          image_url: data.imageUrl || null,
           status: 'active' as const,
         })
         .select()
@@ -186,6 +188,26 @@ export function AddSourceDialog({ children, onSuccess }: AddSourceDialogProps) {
                   </FormControl>
                   <FormDescription>
                     Paste the email address from Kill The Newsletter (feed URL will be generated automatically)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="imageUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Source Image (Optional)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="https://example.com/logo.png" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Add a logo or image for this source (will be shown in issue cards)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

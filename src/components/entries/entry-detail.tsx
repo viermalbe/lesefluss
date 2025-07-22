@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Calendar } from 'lucide-react'
+import { ArrowLeft, Calendar, Heart, Archive } from 'lucide-react'
 import { sanitizeHtml } from '@/lib/utils/sanitize-html'
 import { getRelativeTime } from '@/lib/utils/content-utils'
 import { supabase } from '@/lib/supabase/client'
@@ -114,7 +114,49 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     }
     
     setEntry((prev: any) => ({ ...prev, status: newStatus }))
-    toast.success(newStatus === 'read' ? 'Als gelesen markiert' : 'Als ungelesen markiert')
+    toast.success(newStatus === 'read' ? 'Als geöffnet markiert' : 'Als neu markiert')
+  }
+
+  // Toggle starred status
+  const toggleStarredStatus = async () => {
+    if (!entry) return
+    
+    const newStarred = !entry.starred
+    
+    const { error } = await supabase
+      .from('entries')
+      .update({ starred: newStarred })
+      .eq('id', entryId)
+    
+    if (error) {
+      console.error('Error updating starred status:', error)
+      toast.error('Fehler beim Aktualisieren der Favoriten')
+      return
+    }
+    
+    setEntry((prev: any) => ({ ...prev, starred: newStarred }))
+    toast.success(newStarred ? 'Zu Favoriten hinzugefügt' : 'Aus Favoriten entfernt')
+  }
+
+  // Toggle archived status
+  const toggleArchivedStatus = async () => {
+    if (!entry) return
+    
+    const newArchived = !entry.archived
+    
+    const { error } = await supabase
+      .from('entries')
+      .update({ archived: newArchived })
+      .eq('id', entryId)
+    
+    if (error) {
+      console.error('Error updating archived status:', error)
+      toast.error('Fehler beim Archivieren')
+      return
+    }
+    
+    setEntry((prev: any) => ({ ...prev, archived: newArchived }))
+    toast.success(newArchived ? 'Archiviert' : 'Aus Archiv entfernt')
   }
 
   // Fetch entry on mount
@@ -181,15 +223,40 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
             {/* Integrated Header with Back Button */}
             <div className="p-4 sm:p-6 border-b">
               <div className="space-y-4">
-                {/* Back Button and Time - Inline */}
+                {/* Back Button and Time with Like - Inline */}
                 <div className="flex items-center justify-between">
                   <Button variant="ghost" size="sm" onClick={() => router.back()} className="-ml-2">
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Back
                   </Button>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Calendar className="w-4 h-4 mr-1" />
-                    <span>{getRelativeTime(entry.published_at || entry.created_at)}</span>
+                  <div className="flex items-center gap-3">
+
+                    <div className="flex items-center gap-1">
+                      {/* Archive Button */}
+                      <button
+                        onClick={toggleArchivedStatus}
+                        className={`p-1 rounded-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                          entry.archived ? 'text-black' : 'text-gray-400'
+                        }`}
+                        title={entry.archived ? 'Aus Archiv entfernen' : 'Archivieren'}
+                      >
+                        <Archive className={`w-4 h-4 ${
+                          entry.archived ? 'fill-current' : ''
+                        }`} />
+                      </button>
+                      {/* Like Button */}
+                      <button
+                        onClick={toggleStarredStatus}
+                        className={`p-1 rounded-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                          entry.starred ? 'text-red-500' : 'text-gray-400'
+                        }`}
+                        title={entry.starred ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
+                      >
+                        <Heart className={`w-4 h-4 ${
+                          entry.starred ? 'fill-current' : ''
+                        }`} />
+                      </button>
+                    </div>
                   </div>
                 </div>
                 
@@ -198,9 +265,12 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
                   {entry.title}
                 </h1>
                 
-                <div className="text-sm text-muted-foreground">
-                  <span className="font-medium">{entry.subscription.title}</span>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">{entry.subscription.title}</span>
+                  <span className="text-gray-500">•</span>
+                  <span>{getRelativeTime(entry.published_at || entry.created_at)}</span>
                 </div>
+                
               </div>
             </div>
             

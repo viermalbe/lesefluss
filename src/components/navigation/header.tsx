@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuthContext } from '@/components/providers/auth-provider'
 import { AddSourceDialog } from '@/components/sources/add-source-dialog'
-import { BookOpen, Menu, Plus, Settings, User, LogOut } from 'lucide-react'
+import { BookOpen, Menu, Plus, Settings, User, LogOut, Archive } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +21,7 @@ export function Header() {
 
   const navigation = [
     { name: 'Issues', href: '/issues', icon: BookOpen },
+    { name: 'Archive', href: '/archive', icon: Archive },
     { name: 'Sources', href: '/sources', icon: Menu },
   ]
 

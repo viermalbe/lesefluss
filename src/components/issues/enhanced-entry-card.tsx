@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Clock, Calendar, Heart } from 'lucide-react'
+import { Clock, Calendar, Heart, Archive } from 'lucide-react'
 import { getRelativeTime, getEstimatedReadingTime } from '@/lib/utils/content-utils'
 import { NewsletterPreview } from './newsletter-preview'
 import { supabase } from '@/lib/supabase/client'
@@ -15,6 +15,7 @@ interface EnhancedEntryCardProps {
     published_at: string
     status: 'read' | 'unread'
     starred: boolean
+    archived: boolean
     subscription: {
       id: string
       title: string
@@ -24,9 +25,10 @@ interface EnhancedEntryCardProps {
   }
   onToggleReadStatus: (entryId: string, currentStatus: string) => void
   onToggleStarred?: (entryId: string, currentStarred: boolean) => void
+  onToggleArchived?: (entryId: string, currentArchived: boolean) => void
 }
 
-export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred }: EnhancedEntryCardProps) {
+export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, onToggleArchived }: EnhancedEntryCardProps) {
   const router = useRouter()
 
   const relativeTime = getRelativeTime(entry.published_at)
@@ -71,6 +73,31 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred }
     }
   }
 
+  const handleToggleArchived = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    
+    try {
+      const { error } = await supabase
+        .from('entries')
+        .update({ archived: !entry.archived })
+        .eq('id', entry.id)
+
+      if (error) {
+        toast.error(`Failed to ${entry.archived ? 'unarchive' : 'archive'} issue: ${error.message}`)
+        return
+      }
+
+      toast.success(`Issue ${entry.archived ? 'unarchived' : 'archived'} successfully`)
+      
+      // Call parent callback if provided
+      if (onToggleArchived) {
+        onToggleArchived(entry.id, entry.archived)
+      }
+    } catch (error: any) {
+      toast.error(`Failed to update archived status: ${error.message}`)
+    }
+  }
+
   return (
     <div 
       className={`bg-card rounded-lg transition-all duration-200 border hover:shadow-md cursor-pointer group ${
@@ -79,23 +106,39 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred }
       onClick={handleCardClick}
     >
       <div className="p-4 relative">
-        {/* Heart Icon for Favorites - Absolute positioned top right */}
-        <button
-          onClick={handleToggleStarred}
-          className={`absolute top-3 right-3 p-1 rounded-full transition-colors hover:bg-gray-100 z-10 ${
-            entry.starred ? 'text-red-500' : 'text-gray-400'
-          }`}
-          title={entry.starred ? 'Remove from favorites' : 'Add to favorites'}
-        >
-          <Heart className={`w-4 h-4 ${
-            entry.starred ? 'fill-current' : ''
-          }`} />
-        </button>
+        {/* Action Icons - Top right corner */}
+        <div className="absolute top-3 right-3 flex gap-1 z-10">
+          {/* Archive Icon */}
+          <button
+            onClick={handleToggleArchived}
+            className={`p-1 rounded-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
+              entry.archived ? 'text-black' : 'text-gray-400'
+            }`}
+            title={entry.archived ? 'Unarchive' : 'Archive'}
+          >
+            <Archive className={`w-4 h-4 ${
+              entry.archived ? 'fill-current' : ''
+            }`} />
+          </button>
+          
+          {/* Heart Icon for Favorites */}
+          <button
+            onClick={handleToggleStarred}
+            className={`p-1 rounded-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
+              entry.starred ? 'text-red-500' : 'text-gray-400'
+            }`}
+            title={entry.starred ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Heart className={`w-4 h-4 ${
+              entry.starred ? 'fill-current' : ''
+            }`} />
+          </button>
+        </div>
 
         {/* Main Content Layout */}
         <div className="flex gap-3 mb-3">
           {/* Preview Image - 64x64 */}
-          <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
+          <div className="w-16 h-16 overflow-hidden flex-shrink-0">
             <NewsletterPreview 
               htmlContent={entry.content_html}
               sourceImageUrl={entry.subscription.image_url}
@@ -142,7 +185,7 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred }
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {isUnread ? 'NEW' : 'READ'}
+              {isUnread ? 'NEW' : 'OPENED'}
             </button>
           </div>
         </div>
