@@ -100,8 +100,8 @@ function parseAtomFeed(xmlDoc: any): ParsedFeed {
   const feed = xmlDoc.feed
   if (!feed) throw new Error('Invalid Atom feed')
   
-  const title = feed.title?.['#text'] || feed.title || 'Untitled Feed'
-  const updated = feed.updated?.['#text'] || feed.updated || new Date().toISOString()
+  const title = extractTextValue(feed.title) || 'Untitled Feed'
+  const updated = extractTextValue(feed.updated) || new Date().toISOString()
   
   const entries: FeedEntry[] = []
   const entryElements = Array.isArray(feed.entry) ? feed.entry : [feed.entry].filter(Boolean)
@@ -109,18 +109,19 @@ function parseAtomFeed(xmlDoc: any): ParsedFeed {
   for (const entry of entryElements) {
     if (!entry) continue
     
-    const entryTitle = entry.title?.['#text'] || entry.title || 'Untitled'
-    const entryId = entry.id?.['#text'] || entry.id || ''
-    const published = entry.published?.['#text'] || entry.published || entry.updated?.['#text'] || entry.updated || new Date().toISOString()
+    // Safely extract entry values with better type checking
+    const entryTitle = extractTextValue(entry.title) || 'Untitled'
+    const entryId = extractTextValue(entry.id) || ''
+    const published = extractTextValue(entry.published) || extractTextValue(entry.updated) || new Date().toISOString()
     const link = entry.link?.['@_href'] || (Array.isArray(entry.link) ? entry.link[0]?.['@_href'] : '') || ''
-    const author = entry.author?.name?.['#text'] || entry.author?.name || entry.author?.['#text'] || entry.author || ''
+    const author = extractTextValue(entry.author?.name) || extractTextValue(entry.author) || ''
     
-    // Get content
+    // Get content with robust extraction
     let content = ''
     if (entry.content) {
-      content = entry.content?.['#text'] || entry.content || ''
+      content = extractTextValue(entry.content)
     } else if (entry.summary) {
-      content = entry.summary?.['#text'] || entry.summary || ''
+      content = extractTextValue(entry.summary)
     }
     
     entries.push({
@@ -135,7 +136,7 @@ function parseAtomFeed(xmlDoc: any): ParsedFeed {
   
   return {
     title: decodeHtmlEntities(title),
-    description: feed.subtitle?.['#text'] || feed.subtitle || '',
+    description: decodeHtmlEntities(extractTextValue(feed.subtitle)),
     entries,
     last_updated: new Date(updated).toISOString()
   }
@@ -187,9 +188,22 @@ function parseRssFeed(xmlDoc: any): ParsedFeed {
   }
 }
 
-function decodeHtmlEntities(text: string): string {
+// Helper function to safely extract text values from XML parser objects
+function extractTextValue(value: any): string {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  if (value['#text']) return value['#text']
+  if (typeof value === 'object') return String(value)
+  return String(value)
+}
+
+function decodeHtmlEntities(text: any): string {
   if (!text) return ''
-  return text
+  
+  // Ensure we have a string to work with
+  const stringText = typeof text === 'string' ? text : String(text)
+  
+  return stringText
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')

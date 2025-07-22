@@ -157,6 +157,13 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     
     setEntry((prev: any) => ({ ...prev, archived: newArchived }))
     toast.success(newArchived ? 'Archiviert' : 'Aus Archiv entfernt')
+    
+    // Navigate back to previous page after archiving (not unarchiving)
+    if (newArchived) {
+      setTimeout(() => {
+        router.back()
+      }, 500) // Small delay to show the success toast
+    }
   }
 
   // Fetch entry on mount

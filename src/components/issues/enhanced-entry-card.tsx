@@ -101,7 +101,7 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
   return (
     <div 
       className={`bg-card rounded-lg transition-all duration-200 border hover:shadow-md cursor-pointer group ${
-        entry.status === 'read' ? 'opacity-50 border-gray-400' : ''
+        entry.status === 'read' ? 'border-gray-300' : ''
       }`}
       onClick={handleCardClick}
     >

@@ -172,7 +172,7 @@ export function SourceCard({ subscription, issueCount = 0, onUpdate, onDelete }:
   return (
     <>
       <Card className={`hover:shadow-lg transition-all duration-200 overflow-hidden ${
-        isPaused ? 'opacity-50 border-gray-400' : ''
+        isPaused ? 'border-gray-300' : ''
       }`}>
         <CardContent className="p-6">
           {/* Header with Cover Image and Title */}
