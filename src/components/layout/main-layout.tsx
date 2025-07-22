@@ -16,7 +16,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       <footer className="border-t mt-auto">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <p>&copy; 2024 Lesefluss. Built with Next.js and shadcn/ui.</p>
+            <p>&copy; 2025 Lesefluss - your personal newsletter reader</p>
             <div className="flex items-center space-x-4">
               <a href="#" className="hover:text-foreground transition-colors">
                 Privacy

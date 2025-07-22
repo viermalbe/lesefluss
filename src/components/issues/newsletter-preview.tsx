@@ -65,7 +65,7 @@ export function NewsletterPreview({ htmlContent, sourceImageUrl, className = '' 
           <img 
             src={displayImage} 
             alt="Newsletter preview"
-            className="w-full h-full object-cover object-top"
+            className="w-full h-full object-contain bg-white"
             loading="lazy"
             onError={(e) => {
               // Fallback to text preview if image fails

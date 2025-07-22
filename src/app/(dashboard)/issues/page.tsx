@@ -80,7 +80,8 @@ function IssuesPageContent() {
             id,
             title,
             user_id,
-            status
+            status,
+            image_url
           )
         `)
         .eq('subscription.user_id', user.id)
@@ -217,7 +218,7 @@ function IssuesPageContent() {
       {/* Search and Filter Bar */}
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
+          <div className="relative flex-1 text-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Search issues..."
