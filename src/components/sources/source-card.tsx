@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -31,6 +31,8 @@ interface SourceCardProps {
     image_url?: string | null
   }
   issueCount?: number
+  latestIssueDate?: string
+  weeklyAverage?: number
   onUpdate: () => void
   onDelete: (id: string, title: string) => void
 }
@@ -43,67 +45,28 @@ interface SourceStats {
   websiteUrl: string | null
 }
 
-export function SourceCard({ subscription, issueCount = 0, onUpdate, onDelete }: SourceCardProps) {
+export function SourceCard({ subscription, issueCount = 0, latestIssueDate, weeklyAverage = 0, onUpdate, onDelete }: SourceCardProps) {
   const router = useRouter()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  // Use props directly instead of loading stats separately (performance optimization)
   const [stats, setStats] = useState<SourceStats>({
     totalIssues: issueCount,
-    weeklyAverage: 0,
-    lastIssueDate: null,
+    weeklyAverage: weeklyAverage,
+    lastIssueDate: latestIssueDate || null,
     description: null,
     websiteUrl: null
   })
-  const [isLoadingStats, setIsLoadingStats] = useState(true)
-
-  // Load source statistics
+  const [isLoadingStats, setIsLoadingStats] = useState(false) // No longer loading
+  
+  // Update stats when props change
   useEffect(() => {
-    loadSourceStats()
-  }, [subscription.id])
-
-  const loadSourceStats = async () => {
-    setIsLoadingStats(true)
-    try {
-      // Get entries for this subscription
-      const { data: entries, error } = await supabase
-        .from('entries')
-        .select('published_at, created_at')
-        .eq('subscription_id', subscription.id)
-        .order('published_at', { ascending: false })
-
-      if (error) {
-        console.error('Error loading stats:', error)
-        return
-      }
-
-      const totalIssues = entries?.length || 0
-      let weeklyAverage = 0
-      let lastIssueDate = null
-
-      if (entries && entries.length > 0) {
-        lastIssueDate = entries[0].published_at || entries[0].created_at
-        
-        // Calculate weekly average based on time span
-        const oldestEntry = entries[entries.length - 1]
-        const oldestDate = new Date(oldestEntry.published_at || oldestEntry.created_at)
-        const newestDate = new Date(lastIssueDate)
-        const daysDiff = Math.max(1, (newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24))
-        const weeksDiff = Math.max(1, daysDiff / 7)
-        weeklyAverage = Math.round((totalIssues / weeksDiff) * 10) / 10
-      }
-
-      setStats({
-        totalIssues,
-        weeklyAverage,
-        lastIssueDate,
-        description: null, // Could be extracted from RSS feed in future
-        websiteUrl: null   // Could be extracted from RSS feed in future
-      })
-    } catch (error) {
-      console.error('Error loading source stats:', error)
-    } finally {
-      setIsLoadingStats(false)
-    }
-  }
+    setStats(prev => ({
+      ...prev,
+      totalIssues: issueCount,
+      weeklyAverage: weeklyAverage,
+      lastIssueDate: latestIssueDate || null
+    }))
+  }, [issueCount, latestIssueDate, weeklyAverage])
 
   const handleFilterBySource = () => {
     // Navigate to Issues page with source filter and reset other filters
@@ -283,8 +246,7 @@ export function SourceCard({ subscription, issueCount = 0, onUpdate, onDelete }:
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onUpdate={() => {
-          onUpdate()
-          loadSourceStats() // Reload stats after update
+          onUpdate() // Parent component will provide updated stats
         }}
         onDelete={onDelete}
       />

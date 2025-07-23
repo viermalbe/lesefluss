@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { useScrollPosition } from '@/lib/utils/scroll-position'
 import { useAuth } from '@/lib/hooks'
 import { AddSourceDialog } from '@/components/sources/add-source-dialog'
 import { SourceCard } from '@/components/sources/source-card'
@@ -10,7 +12,6 @@ import { supabase } from '@/lib/supabase/client'
 import { parseFeed, generateGuidHash } from '@/lib/services/feed-parser'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, Plus } from 'lucide-react'
-import { toast } from 'sonner'
 
 export default function SourcesPage() {
   const { user, loading } = useAuth()
@@ -19,15 +20,22 @@ export default function SourcesPage() {
   const [subscriptions, setSubscriptions] = useState<any[]>([])
   const [subscriptionsLoading, setSubscriptionsLoading] = useState(true)
   const [issueCounts, setIssueCounts] = useState<Record<string, number>>({})
+  const [latestIssueDates, setLatestIssueDates] = useState<Record<string, string>>({})
+  const [weeklyAverages, setWeeklyAverages] = useState<Record<string, number>>({})
   const [isSyncing, setIsSyncing] = useState(false)
   
-  // Fetch subscriptions and issue counts directly from Supabase
+  // Scroll position management
+  const { restorePosition, setupAutoSave } = useScrollPosition('sources-page')
+  
+  // Optimized: Load subscriptions with statistics in a single efficient query
   const loadSubscriptions = async () => {
     if (!user) return
     
     setSubscriptionsLoading(true)
     try {
-      // Load subscriptions (includes image_url if column exists)
+      console.time('LoadSubscriptions') // Performance measurement
+      
+      // Single query to get all subscriptions
       const { data: subscriptionsData, error: subscriptionsError } = await supabase
         .from('subscriptions')
         .select('*')
@@ -39,26 +47,97 @@ export default function SourcesPage() {
         return
       }
       
-      console.log('Loaded subscriptions:', subscriptionsData)
-      setSubscriptions(subscriptionsData || [])
-      
-      // Load issue counts for each subscription
-      if (subscriptionsData && subscriptionsData.length > 0) {
-        const counts: Record<string, number> = {}
-        
-        for (const subscription of subscriptionsData) {
-          const { count, error: countError } = await supabase
-            .from('entries')
-            .select('*', { count: 'exact', head: true })
-            .eq('subscription_id', subscription.id)
-          
-          if (!countError && count !== null) {
-            counts[subscription.id] = count
-          }
-        }
-        
-        setIssueCounts(counts)
+      if (!subscriptionsData || subscriptionsData.length === 0) {
+        setSubscriptions([])
+        setIssueCounts({})
+        setLatestIssueDates({})
+        console.timeEnd('LoadSubscriptions')
+        return
       }
+      
+      // Optimized: Single query to get ALL statistics for ALL subscriptions
+      const subscriptionIds = subscriptionsData.map(s => s.id)
+      
+      const { data: entriesData, error: entriesError } = await supabase
+        .from('entries')
+        .select('subscription_id, published_at, created_at')
+        .in('subscription_id', subscriptionIds)
+        .order('published_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+      
+      if (entriesError) {
+        console.error('Error loading entries:', entriesError)
+        // Continue with subscriptions even if entries fail
+        setSubscriptions(subscriptionsData)
+        console.timeEnd('LoadSubscriptions')
+        return
+      }
+      
+      // Process statistics client-side (much faster than multiple DB queries)
+      const counts: Record<string, number> = {}
+      const latestDates: Record<string, string> = {}
+      const weeklyAvgs: Record<string, number> = {}
+      
+      // Group entries by subscription_id
+      const entriesBySubscription = (entriesData || []).reduce((acc, entry) => {
+        if (!acc[entry.subscription_id]) {
+          acc[entry.subscription_id] = []
+        }
+        acc[entry.subscription_id].push(entry)
+        return acc
+      }, {} as Record<string, any[]>)
+      
+      // Calculate statistics for each subscription
+      subscriptionsData.forEach(subscription => {
+        const entries = entriesBySubscription[subscription.id] || []
+        counts[subscription.id] = entries.length
+        
+        if (entries.length > 0) {
+          // Entries are already sorted, so first entry is the latest
+          latestDates[subscription.id] = entries[0].published_at || entries[0].created_at
+          
+          // Calculate weekly average based on actual time span of issues
+          if (entries.length >= 2) {
+            const oldestEntry = entries[entries.length - 1]
+            const oldestDate = new Date(oldestEntry.published_at || oldestEntry.created_at)
+            const newestDate = new Date(entries[0].published_at || entries[0].created_at)
+            const daysDiff = Math.max(1, (newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24))
+            const weeksDiff = Math.max(0.1, daysDiff / 7)
+            weeklyAvgs[subscription.id] = Math.round((entries.length / weeksDiff) * 10) / 10
+          } else {
+            // For single issues, estimate based on subscription age
+            const subscriptionDate = new Date(subscription.created_at)
+            const issueDate = new Date(entries[0].published_at || entries[0].created_at)
+            const daysDiff = Math.max(7, (issueDate.getTime() - subscriptionDate.getTime()) / (1000 * 60 * 60 * 24))
+            const weeksDiff = daysDiff / 7
+            weeklyAvgs[subscription.id] = Math.round((1 / weeksDiff) * 10) / 10
+          }
+        } else {
+          weeklyAvgs[subscription.id] = 0
+        }
+      })
+      
+      setIssueCounts(counts)
+      setLatestIssueDates(latestDates)
+      setWeeklyAverages(weeklyAvgs)
+      
+      // Sort subscriptions by latest issue date (most recent first)
+      const sortedSubscriptions = [...subscriptionsData].sort((a, b) => {
+        const dateA = latestDates[a.id]
+        const dateB = latestDates[b.id]
+        
+        // Sources without entries go to the end
+        if (!dateA && !dateB) return 0
+        if (!dateA) return 1
+        if (!dateB) return -1
+        
+        // Sort by date (newest first)
+        return new Date(dateB).getTime() - new Date(dateA).getTime()
+      })
+      
+      setSubscriptions(sortedSubscriptions)
+      console.timeEnd('LoadSubscriptions') // Log performance
+      console.log(`Loaded ${subscriptionsData.length} subscriptions with ${entriesData?.length || 0} entries in optimized query`)
     } catch (error) {
       console.error('Error loading subscriptions:', error)
     } finally {
@@ -222,6 +301,28 @@ export default function SourcesPage() {
     }
   }, [user])
   
+  // Set up scroll position management
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    // Set up auto-save for scroll position
+    const cleanup = setupAutoSave()
+    
+    return cleanup
+  }, [setupAutoSave])
+  
+  // Restore scroll position after subscriptions are loaded
+  useEffect(() => {
+    if (!subscriptionsLoading && subscriptions.length > 0 && typeof window !== 'undefined') {
+      // Wait a bit for content to render, then restore scroll position
+      const timer = setTimeout(() => {
+        restorePosition()
+      }, 200)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [subscriptionsLoading, subscriptions.length, restorePosition])
+  
   // Delete subscription function
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) {
@@ -329,6 +430,8 @@ export default function SourcesPage() {
                 key={subscription.id}
                 subscription={subscription}
                 issueCount={issueCounts[subscription.id] || 0}
+                latestIssueDate={latestIssueDates[subscription.id]}
+                weeklyAverage={weeklyAverages[subscription.id] || 0}
                 onUpdate={loadSubscriptions}
                 onDelete={handleDelete}
               />

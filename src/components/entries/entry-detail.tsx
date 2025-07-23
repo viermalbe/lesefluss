@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Calendar, Heart, Archive } from 'lucide-react'
@@ -25,6 +25,64 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
   const [entry, setEntry] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Simple scroll position management
+  const hasRestoredRef = useRef(false)
+  
+  // Save scroll position when leaving
+  const saveScrollPosition = useCallback(() => {
+    if (typeof window === 'undefined') return
+    
+    const scrollY = window.pageYOffset || document.documentElement.scrollTop
+    if (scrollY > 50) { // Only save if scrolled significantly
+      sessionStorage.setItem(`scroll_${entryId}`, scrollY.toString())
+      console.log(`Saved scroll position: ${scrollY} for entry ${entryId}`)
+    }
+  }, [entryId])
+  
+  // Restore scroll position
+  const restoreScrollPosition = useCallback(() => {
+    if (typeof window === 'undefined' || hasRestoredRef.current) return
+    
+    const savedScroll = sessionStorage.getItem(`scroll_${entryId}`)
+    if (savedScroll) {
+      const scrollY = parseInt(savedScroll, 10)
+      console.log(`Restoring scroll position: ${scrollY} for entry ${entryId}`)
+      
+      // Multiple attempts to ensure it works
+      const scrollAttempts = [100, 300, 600, 1000]
+      
+      scrollAttempts.forEach((delay, index) => {
+        setTimeout(() => {
+          window.scrollTo(0, scrollY)
+          console.log(`Scroll attempt ${index + 1}: scrolled to ${scrollY}`)
+        }, delay)
+      })
+      
+      hasRestoredRef.current = true
+    } else {
+      console.log(`No saved scroll position for entry ${entryId}`)
+    }
+  }, [entryId])
+  
+  // Save on page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => saveScrollPosition()
+    const handleScroll = () => {
+      // Throttled save during scrolling
+      clearTimeout((window as any).scrollSaveTimeout)
+      ;(window as any).scrollSaveTimeout = setTimeout(saveScrollPosition, 1000)
+    }
+    
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    
+    return () => {
+      saveScrollPosition()
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [saveScrollPosition])
 
   // Fetch entry by ID and automatically mark as read
   const fetchEntry = async () => {
@@ -60,9 +118,13 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
 
       setEntry(data)
       
-      // Sanitize HTML content
+      // Sanitize and transform HTML content for responsive display
       if (data.content_html) {
-        const sanitized = sanitizeHtml(data.content_html)
+        const sanitized = sanitizeHtml(data.content_html, {
+          transform: true, // Enable responsive transformation
+          removeTrackingPixels: true,
+          enableDarkMode: true
+        })
         setSanitizedContent(sanitized)
       }
 
@@ -176,9 +238,27 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
   // Sanitize HTML content on client-side
   useEffect(() => {
     if (entry?.content_html && typeof window !== 'undefined') {
-      setSanitizedContent(sanitizeHtml(entry.content_html))
+      setSanitizedContent(sanitizeHtml(entry.content_html, {
+        transform: true, // Enable responsive transformation
+        removeTrackingPixels: true,
+        enableDarkMode: true
+      }))
     }
   }, [entry?.content_html])
+  
+  // Die setupAutoSave-Funktion wird nicht mehr benötigt, da wir eine eigene Implementierung verwenden
+  
+  // Restore scroll position when content is ready
+  useEffect(() => {
+    if (sanitizedContent && !isLoading && !hasRestoredRef.current) {
+      console.log('Content loaded, attempting to restore scroll position...')
+      
+      // Wait for DOM to be fully rendered
+      setTimeout(() => {
+        restoreScrollPosition()
+      }, 800) // Longer delay to ensure everything is rendered
+    }
+  }, [sanitizedContent, isLoading, restoreScrollPosition])
 
 
 
@@ -221,6 +301,41 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Permanent sticky overlay */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b shadow-sm">
+
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="bg-transparent hover:bg-gray-100">
+            <ArrowLeft className="w-5 h-5 mr-2" />
+            Back
+          </Button>
+          
+          <div className="flex items-center gap-4">
+            {/* Archive Button */}
+            <button
+              onClick={toggleArchivedStatus}
+              className={`hover:opacity-80 transition-opacity ${
+                entry?.archived ? 'text-gray-900' : 'text-gray-500'
+              }`}
+              title={entry?.archived ? 'Remove from archive' : 'Archive'}
+            >
+              <Archive className={`w-5 h-5 ${entry?.archived ? 'fill-gray-400' : ''}`} />
+            </button>
+            
+            {/* Like Button */}
+            <button
+              onClick={toggleStarredStatus}
+              className={`hover:opacity-80 transition-opacity ${
+                entry?.starred ? 'text-rose-500' : 'text-gray-500'
+              }`}
+              title={entry?.starred ? 'Remove from likes' : 'Add to likes'}
+            >
+              <Heart className={`w-5 h-5 ${entry?.starred ? 'fill-rose-500' : ''}`} />
+            </button>
+          </div>
+        </div>
+      </div>
+      
       {/* Mobile-optimized container */}
       <div className="max-w-4xl mx-auto">
         {/* Entry content - Mobile: no card, Desktop: with card */}
@@ -230,49 +345,14 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
             {/* Integrated Header with Back Button */}
             <div className="p-4 sm:p-6 border-b">
               <div className="space-y-4">
-                {/* Back Button and Time with Like - Inline */}
-                <div className="flex items-center justify-between">
-                  <Button variant="ghost" size="sm" onClick={() => router.back()} className="-ml-2">
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back
-                  </Button>
-                  <div className="flex items-center gap-3">
 
-                    <div className="flex items-center gap-1">
-                      {/* Archive Button */}
-                      <button
-                        onClick={toggleArchivedStatus}
-                        className={`p-1 rounded-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                          entry.archived ? 'text-black' : 'text-gray-400'
-                        }`}
-                        title={entry.archived ? 'Aus Archiv entfernen' : 'Archivieren'}
-                      >
-                        <Archive className={`w-4 h-4 ${
-                          entry.archived ? 'fill-current' : ''
-                        }`} />
-                      </button>
-                      {/* Like Button */}
-                      <button
-                        onClick={toggleStarredStatus}
-                        className={`p-1 rounded-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                          entry.starred ? 'text-red-500' : 'text-gray-400'
-                        }`}
-                        title={entry.starred ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
-                      >
-                        <Heart className={`w-4 h-4 ${
-                          entry.starred ? 'fill-current' : ''
-                        }`} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
                 
                 {/* Title and Source */}
-                <h1 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground leading-tight">
                   {entry.title}
                 </h1>
                 
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 text-base text-muted-foreground">
                   <span className="font-medium text-foreground">{entry.subscription.title}</span>
                   <span className="text-gray-500">•</span>
                   <span>{getRelativeTime(entry.published_at || entry.created_at)}</span>
@@ -280,12 +360,12 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
                 
               </div>
             </div>
-            
+
             {/* Content section */}
             <div className="p-4 sm:p-6">
               {sanitizedContent ? (
                 <div 
-                  className="newsletter-content prose prose-gray dark:prose-invert max-w-none prose-sm sm:prose-base"
+                  className="newsletter-display prose prose-gray dark:prose-invert max-w-none prose-sm sm:prose-base"
                   dangerouslySetInnerHTML={{ __html: sanitizedContent }}
                   style={{
                     // Override prose styles for better newsletter rendering

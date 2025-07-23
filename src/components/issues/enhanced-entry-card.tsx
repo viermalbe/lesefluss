@@ -111,26 +111,26 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
           {/* Archive Icon */}
           <button
             onClick={handleToggleArchived}
-            className={`p-1 rounded-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
-              entry.archived ? 'text-black' : 'text-gray-400'
+            className={`p-1 hover:opacity-80 transition-opacity ${
+              entry.archived ? 'text-gray-900' : 'text-gray-400'
             }`}
             title={entry.archived ? 'Unarchive' : 'Archive'}
           >
             <Archive className={`w-4 h-4 ${
-              entry.archived ? 'fill-current' : ''
+              entry.archived ? 'fill-gray-400' : ''
             }`} />
           </button>
           
           {/* Heart Icon for Favorites */}
           <button
             onClick={handleToggleStarred}
-            className={`p-1 rounded-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
-              entry.starred ? 'text-red-500' : 'text-gray-400'
+            className={`p-1 hover:opacity-80 transition-opacity ${
+              entry.starred ? 'text-rose-500' : 'text-gray-400'
             }`}
             title={entry.starred ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Heart className={`w-4 h-4 ${
-              entry.starred ? 'fill-current' : ''
+              entry.starred ? 'fill-rose-500' : ''
             }`} />
           </button>
         </div>

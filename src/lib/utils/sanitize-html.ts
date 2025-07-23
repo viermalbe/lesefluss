@@ -1,10 +1,12 @@
 import DOMPurify from 'dompurify'
+import { transformNewsletterHTML, type TransformOptions } from './newsletter-html-transformer'
 
 /**
  * Sanitizes HTML content for safe rendering in the browser
  * Removes potentially dangerous elements while preserving newsletter formatting
+ * Now includes responsive transformation for mobile-friendly display
  */
-export function sanitizeHtml(html: string): string {
+export function sanitizeHtml(html: string, options?: { transform?: boolean } & TransformOptions): string {
   if (typeof window === 'undefined') {
     // Server-side: return as-is, sanitization happens client-side
     return html
@@ -56,6 +58,12 @@ export function sanitizeHtml(html: string): string {
     '<a $1 target="_blank" rel="noopener noreferrer">'
   )
 
+  // Apply responsive transformation if requested (default: true)
+  const shouldTransform = options?.transform !== false
+  if (shouldTransform) {
+    sanitized = transformNewsletterHTML(sanitized, options)
+  }
+  
   return sanitized
 }
 

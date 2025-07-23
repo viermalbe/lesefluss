@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { EnhancedEntryCard } from '@/components/issues/enhanced-entry-card'
 import { BookOpen, Search, Filter, RefreshCw } from 'lucide-react'
+import { useScrollPosition } from '@/lib/utils/scroll-position'
 import Link from 'next/link'
 
 function IssuesPageContent() {
@@ -25,6 +26,9 @@ function IssuesPageContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [isStateLoaded, setIsStateLoaded] = useState(false)
+  
+  // Scroll position management
+  const { restorePosition, setupAutoSave } = useScrollPosition('issues-page')
 
   // Load persistent state from localStorage and URL parameters
   useEffect(() => {
@@ -65,6 +69,28 @@ function IssuesPageContent() {
       localStorage.setItem('lesefluss-filter-state', statusFilter)
     }
   }, [statusFilter, isStateLoaded])
+  
+  // Set up scroll position management
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    // Set up auto-save for scroll position
+    const cleanup = setupAutoSave()
+    
+    return cleanup
+  }, [setupAutoSave])
+  
+  // Restore scroll position after entries are loaded
+  useEffect(() => {
+    if (!entriesLoading && entries.length > 0 && typeof window !== 'undefined') {
+      // Wait a bit for content to render, then restore scroll position
+      const timer = setTimeout(() => {
+        restorePosition()
+      }, 200)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [entriesLoading, entries.length, restorePosition])
 
   // Fetch entries function
   const fetchEntries = async () => {

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Archive, Loader2, Search, Filter } from 'lucide-react'
+import { useScrollPosition } from '@/lib/utils/scroll-position'
 import { toast } from 'sonner'
 
 interface Entry {
@@ -28,6 +29,9 @@ interface Entry {
 
 export default function ArchivePage() {
   const { user, loading: userLoading } = useAuth()
+  
+  // Scroll position management
+  const { restorePosition, setupAutoSave } = useScrollPosition('archive-page')
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<'all' | 'unread' | 'read' | 'favorites'>('all')
@@ -181,6 +185,28 @@ export default function ArchivePage() {
       fetchArchivedEntries()
     }
   }, [user, statusFilter])
+  
+  // Set up scroll position management
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    // Set up auto-save for scroll position
+    const cleanup = setupAutoSave()
+    
+    return cleanup
+  }, [setupAutoSave])
+  
+  // Restore scroll position after entries are loaded
+  useEffect(() => {
+    if (!loading && entries.length > 0 && typeof window !== 'undefined') {
+      // Wait a bit for content to render, then restore scroll position
+      const timer = setTimeout(() => {
+        restorePosition()
+      }, 200)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [loading, entries.length, restorePosition])
 
   if (userLoading) {
     return (
