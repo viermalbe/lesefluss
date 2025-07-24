@@ -15,6 +15,24 @@ import { BookOpen, Search, Filter, RefreshCw } from 'lucide-react'
 import { useScrollPosition } from '@/lib/utils/scroll-position'
 import Link from 'next/link'
 
+// Verhindert das automatische Neuladen beim Fokuswechsel
+function disableFocusRefresh() {
+  if (typeof window === 'undefined') return
+
+  // Überschreibe die visibilityState-Getter-Methode
+  try {
+    Object.defineProperty(Document.prototype, 'visibilityState', {
+      get: function() {
+        // Gib immer "visible" zurück, unabhängig vom tatsächlichen Status
+        return 'visible'
+      }
+    })
+    console.log('Focus refresh disabled: visibilityState overridden')
+  } catch (e) {
+    console.error('Could not override visibilityState:', e)
+  }
+}
+
 function IssuesPageContent() {
   const { user, loading } = useAuth()
   const { isLoading: syncLoading, canSync, triggerSync, autoSyncIfNeeded, getTimeUntilNextSync } = useSmartSync()
@@ -27,8 +45,13 @@ function IssuesPageContent() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [isStateLoaded, setIsStateLoaded] = useState(false)
   
-  // Scroll position management
-  const { restorePosition, setupAutoSave } = useScrollPosition('issues-page')
+  // Verhindere automatisches Neuladen beim Fokuswechsel
+  useEffect(() => {
+    disableFocusRefresh()
+  }, [])
+  
+  // Scroll position management - mit automatischer Wiederherstellung
+  const { savePosition, restorePosition, setupAutoSave } = useScrollPosition('issues-page')
 
   // Load persistent state from localStorage and URL parameters
   useEffect(() => {
@@ -70,7 +93,7 @@ function IssuesPageContent() {
     }
   }, [statusFilter, isStateLoaded])
   
-  // Set up scroll position management
+  // Verbesserte Scroll-Position-Verwaltung mit automatischer Wiederherstellung
   useEffect(() => {
     if (typeof window === 'undefined') return
     
@@ -83,12 +106,14 @@ function IssuesPageContent() {
   // Restore scroll position after entries are loaded
   useEffect(() => {
     if (!entriesLoading && entries.length > 0 && typeof window !== 'undefined') {
-      // Wait a bit for content to render, then restore scroll position
-      const timer = setTimeout(() => {
-        restorePosition()
-      }, 200)
+      // Multiple restoration attempts with different delays for reliability
+      const scrollAttempts = [100, 300, 600, 1000]
       
-      return () => clearTimeout(timer)
+      scrollAttempts.forEach((delay) => {
+        setTimeout(() => {
+          restorePosition()
+        }, delay)
+      })
     }
   }, [entriesLoading, entries.length, restorePosition])
 

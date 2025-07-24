@@ -1,0 +1,116 @@
+/* 
+ * Newsletter Viewer Styles
+ * 
+ * Diese Styles sorgen für eine responsive Darstellung von Newslettern,
+ * basierend auf den PRD-Anforderungen für den View Mode und Best Practices.
+ */
+
+/* Grundlegendes CSS-Reset für den Newsletter-Container */
+.newsletter-viewer {
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* 
+ * Newsletter-Content-Container 
+ * Enthält das transformierte HTML mit responsiven Anpassungen
+ */
+.newsletter-content {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* 
+ * Styles für den Newsletter-Wrapper
+ * Diese werden vom NewsletterParser hinzugefügt
+ */
+.newsletter-wrapper {
+  all: initial;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  max-width: 100%;
+  display: block;
+}
+
+/* Alle Elemente im Wrapper */
+.newsletter-wrapper * {
+  box-sizing: border-box;
+  max-width: 100% !important;
+}
+
+/* Responsive Bilder */
+.newsletter-wrapper img,
+.newsletter-content img {
+  width: 100% !important;
+  height: auto !important;
+  display: block;
+}
+
+/* Responsive Tabellen */
+.newsletter-wrapper table,
+.newsletter-content table {
+  width: 100% !important;
+  max-width: 100% !important;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.newsletter-wrapper td, 
+.newsletter-wrapper th,
+.newsletter-content td,
+.newsletter-content th {
+  word-break: break-word;
+  max-width: 100% !important;
+}
+
+/* Responsive Tabellenzellen */
+.newsletter-table-cell {
+  padding: 8px;
+  vertical-align: top;
+}
+
+/* Responsive Bilder in Tabellen */
+.newsletter-table-cell img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Responsive Bilder mit Aspect-Ratio-Erhaltung */
+.newsletter-image {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Spezielle Anpassungen für mobile Geräte */
+@media (max-width: 640px) {
+  .newsletter-wrapper table,
+  .newsletter-content table {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .newsletter-wrapper td,
+  .newsletter-wrapper th,
+  .newsletter-content td,
+  .newsletter-content th {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Ausnahme für Tabellenzellen, die nebeneinander bleiben sollen */
+  .newsletter-row-cells td,
+  .newsletter-row-cells th {
+    display: table-cell;
+  }
+}
+
+/* Loading-Zustand */
+.newsletter-loading {
+  padding: 2rem;
+  text-align: center;
+  color: #666;
+}

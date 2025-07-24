@@ -112,12 +112,12 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
           <button
             onClick={handleToggleArchived}
             className={`p-1 hover:opacity-80 transition-opacity ${
-              entry.archived ? 'text-gray-900' : 'text-gray-400'
+              entry.archived ? 'text-gray-900' : 'text-slate-400'
             }`}
             title={entry.archived ? 'Unarchive' : 'Archive'}
           >
             <Archive className={`w-4 h-4 ${
-              entry.archived ? 'fill-gray-400' : ''
+              entry.archived ? 'fill-slate-400' : ''
             }`} />
           </button>
           
@@ -125,18 +125,18 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
           <button
             onClick={handleToggleStarred}
             className={`p-1 hover:opacity-80 transition-opacity ${
-              entry.starred ? 'text-rose-500' : 'text-gray-400'
+              entry.starred ? 'text-pink-500' : 'text-gray-400'
             }`}
             title={entry.starred ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Heart className={`w-4 h-4 ${
-              entry.starred ? 'fill-rose-500' : ''
+              entry.starred ? 'fill-pink-600' : ''
             }`} />
           </button>
         </div>
 
         {/* Main Content Layout */}
-        <div className="flex gap-3 mb-3">
+        <div className="flex gap-3 mb-0">
           {/* Preview Image - 64x64 */}
           <div className="w-16 h-16 overflow-hidden flex-shrink-0">
             <NewsletterPreview 
@@ -148,11 +148,12 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
           
           {/* Content - Source and Title */}
           <div className="flex-1 min-w-0">
+            
             <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
               {entry.subscription.title}
             </div>
             
-            <h3 className={`text-lg line-clamp-2 leading-tight ${
+            <h3 className={`text-base line-clamp-2 leading-tight ${
               entry.status === 'read' ? 'text-gray-600' : 'text-gray-900 font-medium'
             }`}>
               {entry.title}

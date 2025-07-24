@@ -311,15 +311,17 @@ export default function SourcesPage() {
     return cleanup
   }, [setupAutoSave])
   
-  // Restore scroll position after subscriptions are loaded
+  // Restore scroll position after subscriptions are loaded with multiple attempts
   useEffect(() => {
     if (!subscriptionsLoading && subscriptions.length > 0 && typeof window !== 'undefined') {
-      // Wait a bit for content to render, then restore scroll position
-      const timer = setTimeout(() => {
-        restorePosition()
-      }, 200)
+      // Multiple restoration attempts with different delays for reliability
+      const scrollAttempts = [100, 300, 600, 1000]
       
-      return () => clearTimeout(timer)
+      scrollAttempts.forEach((delay) => {
+        setTimeout(() => {
+          restorePosition()
+        }, delay)
+      })
     }
   }, [subscriptionsLoading, subscriptions.length, restorePosition])
   

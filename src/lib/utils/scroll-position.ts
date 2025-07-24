@@ -13,7 +13,7 @@ interface ScrollPosition {
 
 const SCROLL_STORAGE_PREFIX = 'lesefluss_scroll_'
 const SCROLL_RESTORE_DELAY = 100 // ms to wait before restoring scroll
-const SCROLL_SAVE_THROTTLE = 250 // ms to throttle scroll save events
+const SCROLL_SAVE_THROTTLE = 1000 // ms to throttle scroll save events (increased to reduce frequency)
 
 class ScrollPositionManager {
   private throttleTimers: Map<string, NodeJS.Timeout> = new Map()
@@ -49,7 +49,7 @@ class ScrollPositionManager {
         }
 
         sessionStorage.setItem(key, JSON.stringify(position))
-        console.log(`Saved scroll position for ${identifier}:`, position)
+        // Debug logs removed to reduce console noise
       } catch (error) {
         console.warn('Failed to save scroll position:', error)
       }
@@ -69,7 +69,7 @@ class ScrollPositionManager {
       const savedData = sessionStorage.getItem(key)
       
       if (!savedData) {
-        console.log(`No saved scroll position found for ${identifier}`)
+        // Debug logs removed to reduce console noise
         return false
       }
 
@@ -78,14 +78,19 @@ class ScrollPositionManager {
       // Check if the saved position is not too old (max 1 hour)
       const maxAge = 60 * 60 * 1000 // 1 hour in ms
       if (Date.now() - position.timestamp > maxAge) {
-        console.log(`Scroll position for ${identifier} is too old, ignoring`)
+        // Debug logs removed to reduce console noise
         this.clearScrollPosition(identifier)
+        return false
+      }
+
+      // Only restore if scrolled significantly (> 100px)
+      if (position.y <= 100) {
         return false
       }
 
       this.isRestoring = true
 
-      // Use setTimeout to ensure DOM is ready and content is loaded
+      // Simplified: single attempt to restore scroll position
       setTimeout(() => {
         try {
           window.scrollTo({
@@ -94,13 +99,10 @@ class ScrollPositionManager {
             behavior: 'auto' // Use 'auto' for instant positioning
           })
           
-          console.log(`Restored scroll position for ${identifier}:`, position)
+          // Debug logs removed to reduce console noise
           
-          // Clear the restoring flag after a short delay
-          setTimeout(() => {
-            this.isRestoring = false
-          }, 500)
-          
+          // Clear the restoring flag immediately
+          this.isRestoring = false
         } catch (error) {
           console.warn('Failed to restore scroll position:', error)
           this.isRestoring = false
@@ -122,7 +124,7 @@ class ScrollPositionManager {
     try {
       const key = this.getStorageKey(identifier)
       sessionStorage.removeItem(key)
-      console.log(`Cleared scroll position for ${identifier}`)
+      // Debug logs removed to reduce console noise
     } catch (error) {
       console.warn('Failed to clear scroll position:', error)
     }
@@ -130,14 +132,11 @@ class ScrollPositionManager {
 
   /**
    * Set up automatic scroll position saving for page visibility changes
+   * 
+   * HINWEIS: visibilitychange-Event wurde entfernt, um unerwünschte Neuladeeffekte zu vermeiden
    */
   setupAutoSave(identifier: string): () => void {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        this.saveScrollPosition(identifier)
-      }
-    }
-
+    // Nur noch auf explizite Benutzeraktionen reagieren
     const handleBeforeUnload = () => {
       this.saveScrollPosition(identifier)
     }
@@ -146,14 +145,12 @@ class ScrollPositionManager {
       this.saveScrollPosition(identifier)
     }
 
-    // Add event listeners
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    // Add event listeners - visibilitychange entfernt!
     window.addEventListener('beforeunload', handleBeforeUnload)
     window.addEventListener('scroll', handleScroll, { passive: true })
 
     // Return cleanup function
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('beforeunload', handleBeforeUnload)
       window.removeEventListener('scroll', handleScroll)
       
@@ -184,7 +181,7 @@ class ScrollPositionManager {
               const position: ScrollPosition = JSON.parse(data)
               if (now - position.timestamp > maxAge) {
                 sessionStorage.removeItem(key)
-                console.log(`Cleaned up old scroll position: ${key}`)
+                // Debug logs removed to reduce console noise
               }
             }
           } catch (error) {

@@ -4,11 +4,12 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Calendar, Heart, Archive } from 'lucide-react'
-import { sanitizeHtml } from '@/lib/utils/sanitize-html'
+import DOMPurify from 'dompurify'
 import { getRelativeTime } from '@/lib/utils/content-utils'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/hooks'
+import { NewsletterViewer } from '@/components/newsletter/newsletter-viewer'
 
 interface EntryDetailProps {
   entryId: string
@@ -26,63 +27,8 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // Simple scroll position management
-  const hasRestoredRef = useRef(false)
-  
-  // Save scroll position when leaving
-  const saveScrollPosition = useCallback(() => {
-    if (typeof window === 'undefined') return
-    
-    const scrollY = window.pageYOffset || document.documentElement.scrollTop
-    if (scrollY > 50) { // Only save if scrolled significantly
-      sessionStorage.setItem(`scroll_${entryId}`, scrollY.toString())
-      console.log(`Saved scroll position: ${scrollY} for entry ${entryId}`)
-    }
-  }, [entryId])
-  
-  // Restore scroll position
-  const restoreScrollPosition = useCallback(() => {
-    if (typeof window === 'undefined' || hasRestoredRef.current) return
-    
-    const savedScroll = sessionStorage.getItem(`scroll_${entryId}`)
-    if (savedScroll) {
-      const scrollY = parseInt(savedScroll, 10)
-      console.log(`Restoring scroll position: ${scrollY} for entry ${entryId}`)
-      
-      // Multiple attempts to ensure it works
-      const scrollAttempts = [100, 300, 600, 1000]
-      
-      scrollAttempts.forEach((delay, index) => {
-        setTimeout(() => {
-          window.scrollTo(0, scrollY)
-          console.log(`Scroll attempt ${index + 1}: scrolled to ${scrollY}`)
-        }, delay)
-      })
-      
-      hasRestoredRef.current = true
-    } else {
-      console.log(`No saved scroll position for entry ${entryId}`)
-    }
-  }, [entryId])
-  
-  // Save on page unload
-  useEffect(() => {
-    const handleBeforeUnload = () => saveScrollPosition()
-    const handleScroll = () => {
-      // Throttled save during scrolling
-      clearTimeout((window as any).scrollSaveTimeout)
-      ;(window as any).scrollSaveTimeout = setTimeout(saveScrollPosition, 1000)
-    }
-    
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    
-    return () => {
-      saveScrollPosition()
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-      window.removeEventListener('scroll', handleScroll)
-    }
-  }, [saveScrollPosition])
+  // Einfache Scroll-Position-Wiederherstellung mit sessionStorage
+  const scrollPositionKey = `scroll-position-${entryId}`
 
   // Fetch entry by ID and automatically mark as read
   const fetchEntry = async () => {
@@ -118,14 +64,15 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
 
       setEntry(data)
       
-      // Sanitize and transform HTML content for responsive display
+      // Direkt das Original-HTML anzeigen (nur grundlegende Sicherheitsbereinigung)
       if (data.content_html) {
-        const sanitized = sanitizeHtml(data.content_html, {
-          transform: true, // Enable responsive transformation
-          removeTrackingPixels: true,
-          enableDarkMode: true
+        // Einfache DOMPurify-Bereinigung ohne Transformationen
+        const basicSanitized = DOMPurify.sanitize(data.content_html, {
+          ADD_ATTR: ['target'],
+          FORBID_TAGS: ['script', 'object', 'embed', 'form', 'input', 'button'],
+          FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover']
         })
-        setSanitizedContent(sanitized)
+        setSanitizedContent(basicSanitized)
       }
 
       // Automatically mark as read if it's unread
@@ -238,29 +185,58 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
   // Sanitize HTML content on client-side
   useEffect(() => {
     if (entry?.content_html && typeof window !== 'undefined') {
-      setSanitizedContent(sanitizeHtml(entry.content_html, {
-        transform: true, // Enable responsive transformation
-        removeTrackingPixels: true,
-        enableDarkMode: true
-      }))
+      // Einfache DOMPurify-Bereinigung ohne Transformationen
+      const basicSanitized = DOMPurify.sanitize(entry.content_html, {
+        ADD_ATTR: ['target'],
+        FORBID_TAGS: ['script', 'object', 'embed', 'form', 'input', 'button'],
+        FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover']
+      })
+      setSanitizedContent(basicSanitized)
     }
   }, [entry?.content_html])
   
-  // Die setupAutoSave-Funktion wird nicht mehr benötigt, da wir eine eigene Implementierung verwenden
-  
-  // Restore scroll position when content is ready
+  // Einfache Scroll-Position-Wiederherstellung
   useEffect(() => {
-    if (sanitizedContent && !isLoading && !hasRestoredRef.current) {
-      console.log('Content loaded, attempting to restore scroll position...')
+    if (!isLoading && entry) {
+      // Verzögerung, um sicherzustellen, dass der Inhalt vollständig geladen ist
+      const timer = setTimeout(() => {
+        try {
+          // Gespeicherte Position abrufen
+          const savedPosition = sessionStorage.getItem(scrollPositionKey)
+          if (savedPosition) {
+            window.scrollTo({
+              top: parseInt(savedPosition),
+              behavior: 'instant' // Sofortiges Scrollen ohne Animation
+            })
+          }
+        } catch (err) {
+          console.error('Error restoring scroll position:', err)
+        }
+      }, 100) // Kurze Verzögerung
       
-      // Wait for DOM to be fully rendered
-      setTimeout(() => {
-        restoreScrollPosition()
-      }, 800) // Longer delay to ensure everything is rendered
+      return () => clearTimeout(timer)
     }
-  }, [sanitizedContent, isLoading, restoreScrollPosition])
-
-
+  }, [isLoading, entry, scrollPositionKey])
+  
+  // Scroll-Position speichern beim Scrollen
+  useEffect(() => {
+    if (!isLoading && entry) {
+      const handleScroll = () => {
+        try {
+          sessionStorage.setItem(scrollPositionKey, window.scrollY.toString())
+        } catch (err) {
+          console.error('Error saving scroll position:', err)
+        }
+      }
+      
+      // Event-Listener mit Passive-Option für bessere Performance
+      window.addEventListener('scroll', handleScroll, { passive: true })
+      
+      return () => {
+        window.removeEventListener('scroll', handleScroll)
+      }
+    }
+  }, [isLoading, entry, scrollPositionKey])
 
   if (isLoading) {
     return (
@@ -301,9 +277,8 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Permanent sticky overlay */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b shadow-sm">
-
+      {/* Sticky header with navigation and actions */}
+      <div className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <Button variant="ghost" size="sm" onClick={() => router.back()} className="bg-transparent hover:bg-gray-100">
             <ArrowLeft className="w-5 h-5 mr-2" />
@@ -314,7 +289,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
             {/* Archive Button */}
             <button
               onClick={toggleArchivedStatus}
-              className={`hover:opacity-80 transition-opacity ${
+              className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
                 entry?.archived ? 'text-gray-900' : 'text-gray-500'
               }`}
               title={entry?.archived ? 'Remove from archive' : 'Archive'}
@@ -325,7 +300,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
             {/* Like Button */}
             <button
               onClick={toggleStarredStatus}
-              className={`hover:opacity-80 transition-opacity ${
+              className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
                 entry?.starred ? 'text-rose-500' : 'text-gray-500'
               }`}
               title={entry?.starred ? 'Remove from likes' : 'Add to likes'}
@@ -348,7 +323,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
 
                 
                 {/* Title and Source */}
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground leading-tight">
+                <h1 className="text-xl sm:text-2xl font-bold mb-0 text-foreground leading-tight">
                   {entry.title}
                 </h1>
                 
@@ -364,27 +339,16 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
             {/* Content section */}
             <div className="p-4 sm:p-6">
               {sanitizedContent ? (
-                <div 
-                  className="newsletter-display prose prose-gray dark:prose-invert max-w-none prose-sm sm:prose-base"
-                  dangerouslySetInnerHTML={{ __html: sanitizedContent }}
-                  style={{
-                    // Override prose styles for better newsletter rendering
-                    '--tw-prose-body': 'var(--foreground)',
-                    '--tw-prose-headings': 'var(--foreground)',
-                    '--tw-prose-links': 'var(--primary)',
-                    '--tw-prose-bold': 'var(--foreground)',
-                    '--tw-prose-counters': 'var(--muted-foreground)',
-                    '--tw-prose-bullets': 'var(--muted-foreground)',
-                    '--tw-prose-hr': 'var(--border)',
-                    '--tw-prose-quotes': 'var(--muted-foreground)',
-                    '--tw-prose-quote-borders': 'var(--border)',
-                    '--tw-prose-captions': 'var(--muted-foreground)',
-                    '--tw-prose-code': 'var(--foreground)',
-                    '--tw-prose-pre-code': 'var(--muted-foreground)',
-                    '--tw-prose-pre-bg': 'var(--muted)',
-                    '--tw-prose-th-borders': 'var(--border)',
-                    '--tw-prose-td-borders': 'var(--border)',
-                  } as React.CSSProperties}
+                <NewsletterViewer 
+                  htmlContent={sanitizedContent}
+                  maxWidth="800px"
+                  preserveOriginalStyles={true}
+                  removeTrackingPixels={true}
+                  makeImagesResponsive={true}
+                  fixTableLayouts={true}
+                  enableDarkMode={true}
+                  wrapInContainer={true}
+                  className="newsletter-view-mode"
                 />
               ) : (
                 <div className="text-center py-8">
