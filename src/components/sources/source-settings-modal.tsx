@@ -19,6 +19,7 @@ import {
   Image as ImageIcon,
   Settings
 } from 'lucide-react'
+import { uploadImage } from '@/lib/utils/image-utils'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase/client'
 
@@ -133,20 +134,25 @@ export function SourceSettingsModal({
     }
   }
 
-  const handleUpdateImage = async () => {
+  const handleUpdateImage = async (imageUrl: string | null) => {
     setIsUpdating(true)
     try {
+      // Check if we're removing the image or updating it
+      const action = imageUrl ? 'update' : 'remove'
+      
+      console.log(`Updating subscription ${subscription.id} with image_url:`, imageUrl)
+      
       const { error } = await supabase
         .from('subscriptions')
-        .update({ image_url: editImageUrl || null } as any)
+        .update({ image_url: imageUrl })
         .eq('id', subscription.id)
 
       if (error) {
-        toast.error(`Failed to update image: ${error.message}`)
+        toast.error(`Failed to ${action} image: ${error.message}`)
         return
       }
 
-      toast.success('Source image updated successfully')
+      toast.success(`Source image ${action}d successfully`)
       setIsEditingImage(false)
       onUpdate()
     } catch (error: any) {
@@ -274,15 +280,16 @@ export function SourceSettingsModal({
           {/* Image Section */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium flex items-center gap-1">
-                <ImageIcon className="h-3 w-3" />
-                Source Image
-              </label>
+              <label className="text-sm font-medium">Source Image</label>
               {!isEditingImage && (
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setIsEditingImage(true)}
+                  onClick={() => {
+                    setIsEditingImage(true);
+                    // Initialize with current image URL
+                    setEditImageUrl(subscription.image_url || '');
+                  }}
                   className="text-xs"
                 >
                   <Edit2 className="h-3 w-3 mr-1" />
@@ -293,38 +300,110 @@ export function SourceSettingsModal({
             
             {isEditingImage ? (
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={editImageUrl}
-                    onChange={(e) => setEditImageUrl(e.target.value)}
-                    placeholder="https://example.com/image.jpg"
-                    disabled={isUpdating}
-                    className="flex-1"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleUpdateImage}
-                    disabled={isUpdating}
-                  >
-                    <Check className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleCancelImageEdit}
-                    disabled={isUpdating}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                <div className="flex flex-col gap-3">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-medium">Bild hochladen:</p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleCancelImageEdit}
+                      disabled={isUpdating}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  {/* Image Upload Component */}
+                  <div className="border rounded p-3">
+                    {/* Current Image Preview */}
+                    {editImageUrl ? (
+                      <div className="mb-3">
+                        <p className="text-sm font-medium mb-1">Aktuelles Bild:</p>
+                        <div className="relative inline-block">
+                          <img 
+                            src={editImageUrl} 
+                            alt="Preview" 
+                            className="w-16 h-16 object-cover rounded border border-gray-200"
+                            onError={() => {
+                              toast.error('Failed to load image');
+                              setEditImageUrl('');
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                            onClick={() => {
+                              // Clear image URL locally
+                              setEditImageUrl('');
+                              // Update in database
+                              handleUpdateImage(null);
+                            }}
+                            disabled={isUpdating}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mb-3">
+                        <p className="text-sm font-medium mb-1">Kein Bild ausgewählt</p>
+                      </div>
+                    )}
+                    
+                    {/* File Upload Input */}
+                    <div>
+                      <label htmlFor="image-upload" className="text-sm font-medium block mb-1">
+                        Bild vom Computer hochladen:
+                      </label>
+                      <input
+                        id="image-upload"
+                        type="file"
+                        accept="image/*"
+                        className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          
+                          // Validate file
+                          if (!file.type.startsWith('image/')) {
+                            toast.error('Please select an image file');
+                            return;
+                          }
+                          
+                          if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                            toast.error('Image size must be less than 5MB');
+                            return;
+                          }
+                          
+                          setIsUpdating(true);
+                          try {
+                            // Upload to Supabase Storage using our utility function
+                            const path = 'sources';
+                            const imageUrl = await uploadImage(file, path);
+                            
+                            if (imageUrl) {
+                              // Update local state
+                              setEditImageUrl(imageUrl);
+                              // Update in database
+                              await handleUpdateImage(imageUrl);
+                              toast.success('Image uploaded successfully');
+                            } else {
+                              toast.error('Failed to upload image');
+                            }
+                          } catch (error) {
+                            console.error('Upload error:', error);
+                            toast.error('Failed to upload image');
+                          } finally {
+                            setIsUpdating(false);
+                          }
+                        }}
+                        disabled={isUpdating}
+                      />
+                    </div>
+                  </div>
                 </div>
-                {editImageUrl && (
-                  <img 
-                    src={editImageUrl} 
-                    alt="Preview" 
-                    className="w-16 h-16 object-cover rounded border"
-                    onError={() => toast.error('Invalid image URL')}
-                  />
-                )}
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -333,6 +412,9 @@ export function SourceSettingsModal({
                     src={subscription.image_url} 
                     alt={subscription.title} 
                     className="w-12 h-12 object-cover rounded border"
+                    onError={() => {
+                      toast.error('Failed to load image');
+                    }}
                   />
                 ) : (
                   <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center">

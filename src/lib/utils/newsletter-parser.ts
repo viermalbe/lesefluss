@@ -126,33 +126,32 @@ export class NewsletterParser {
   }
   
   /**
-   * Make images responsive by removing fixed dimensions and applying best practices
+   * Make images responsive and optimize through proxy
+   * @param $ - Cheerio instance
    */
   private makeImagesResponsive($: cheerio.CheerioAPI): void {
     $('img').each((_, el) => {
-      // Skip tiny images that might be tracking pixels
-      const width = $(el).attr('width')
-      const height = $(el).attr('height')
-      const isTrackingPixel = (width === '1' && height === '1') || 
-                           (width === '0' && height === '0')
+      const $img = $(el)
+      const originalSrc = $img.attr('src')
       
-      if (isTrackingPixel) {
-        return
+      if (originalSrc) {
+        // Add data attribute with original source
+        $img.attr('data-original-src', originalSrc)
+        
+        // Add data attribute for image proxy
+        $img.attr('data-use-proxy', 'true')
+        
+        // Add client-side script hook for image optimization
+        $img.addClass('newsletter-optimized-image')
       }
       
-      // Calculate and store aspect ratio if both dimensions are available
-      let aspectRatio: number | null = null
-      if (width && height) {
-        const w = parseInt(width, 10)
-        const h = parseInt(height, 10)
-        if (w > 0 && h > 0) {
-          aspectRatio = w / h
-        }
-      }
+      // Add responsive attributes
+      $img.attr('loading', 'lazy')
+      $img.attr('style', 'max-width: 100%; height: auto;')
       
-      // Remove width/height attributes
-      $(el).removeAttr('width')
-      $(el).removeAttr('height')
+      // Remove fixed dimensions
+      $img.removeAttr('width')
+      $img.removeAttr('height')
       
       // Add responsive styling - Best Practice: use !important
       let style = $(el).attr('style') || ''
@@ -164,10 +163,8 @@ export class NewsletterParser {
       // Add max-width and preserve aspect ratio - Best Practice: width: 100% !important
       style += 'width: 100% !important; max-width: 100% !important; height: auto !important; display: block; margin: 0 auto;'
       
-      // Add aspect ratio if available using modern CSS
-      if (aspectRatio) {
-        style += `aspect-ratio: ${aspectRatio.toFixed(3)};`
-      }
+      // Add modern CSS for better rendering
+      style += 'object-fit: contain;'
       
       $(el).attr('style', style)
       

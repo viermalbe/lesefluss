@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { Clock, Calendar, Heart, Archive } from 'lucide-react'
 import { getRelativeTime, getEstimatedReadingTime } from '@/lib/utils/content-utils'
-import { NewsletterPreview } from './newsletter-preview'
+import { OptimizedImage } from '@/components/ui/optimized-image'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
@@ -26,6 +26,45 @@ interface EnhancedEntryCardProps {
   onToggleReadStatus: (entryId: string, currentStatus: string) => void
   onToggleStarred?: (entryId: string, currentStarred: boolean) => void
   onToggleArchived?: (entryId: string, currentArchived: boolean) => void
+}
+
+// Hilfsfunktion zum Extrahieren des ersten Bildes aus HTML-Inhalt
+const getFirstImageFromHtml = (html: string): string | null => {
+  const imgMatches = html.match(/<img[^>]+src="([^"]+)"[^>]*>/gi)
+  if (!imgMatches) return null
+  
+  for (const imgTag of imgMatches) {
+    const srcMatch = imgTag.match(/src="([^"]+)"/i)
+    if (!srcMatch) continue
+    
+    const src = srcMatch[1]
+    
+    // Skip common tracking pixel patterns
+    if (
+      src.includes('track') ||
+      src.includes('pixel') ||
+      src.includes('beacon') ||
+      src.includes('analytics') ||
+      src.includes('1x1') ||
+      src.includes('transparent') ||
+      src.endsWith('.gif') && src.includes('1bwq5') // WIRED tracking pattern
+    ) {
+      continue
+    }
+    
+    // Skip very small images (likely tracking)
+    const widthMatch = imgTag.match(/width=["']?(\d+)/i)
+    const heightMatch = imgTag.match(/height=["']?(\d+)/i)
+    if (widthMatch && heightMatch) {
+      const width = parseInt(widthMatch[1])
+      const height = parseInt(heightMatch[1])
+      if (width < 50 || height < 50) continue
+    }
+    
+    return src
+  }
+  
+  return null
 }
 
 export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, onToggleArchived }: EnhancedEntryCardProps) {
@@ -138,11 +177,12 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
         {/* Main Content Layout */}
         <div className="flex gap-3 mb-0">
           {/* Preview Image - 64x64 */}
-          <div className="w-16 h-16 overflow-hidden flex-shrink-0">
-            <NewsletterPreview 
-              htmlContent={entry.content_html}
-              sourceImageUrl={entry.subscription.image_url}
-              className="w-full h-full"
+          <div className="w-16 h-16 overflow-hidden flex-shrink-0 rounded">
+            <OptimizedImage 
+              src={entry.subscription.image_url || getFirstImageFromHtml(entry.content_html)}
+              alt={entry.title}
+              className="w-full h-full object-cover"
+              sourceId={entry.subscription.id}
             />
           </div>
           

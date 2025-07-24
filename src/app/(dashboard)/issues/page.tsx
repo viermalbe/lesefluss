@@ -275,11 +275,11 @@ function IssuesPageContent() {
               placeholder="Search issues..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 !bg-white border-gray-900"
+              className="pl-10"
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[180px] !bg-white border-gray-900">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <Filter className="mr-2 h-4 w-4" />
               <SelectValue placeholder="All Issues" />
             </SelectTrigger>

@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SourceSettingsModal } from './source-settings-modal'
+import { OptimizedImage } from '@/components/ui/optimized-image'
 import { 
   Settings,
   ExternalLink,
@@ -142,19 +143,15 @@ export function SourceCard({ subscription, issueCount = 0, latestIssueDate, week
           <div className="flex items-start gap-4 mb-4">
             {/* Cover Image - Not clickable anymore */}
             <div className="flex-shrink-0">
-              {subscription.image_url ? (
-                <div className="w-16 h-16 bg-white rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                  <img 
-                    src={subscription.image_url} 
-                    alt={subscription.title}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg border flex items-center justify-center hover:shadow-md transition-shadow">
-                  <ImageIcon className="h-8 w-8 text-gray-400" />
-                </div>
-              )}
+              <div className="w-16 h-16 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+                <OptimizedImage 
+                  src={subscription.image_url}
+                  alt={subscription.title}
+                  className="w-full h-full object-contain bg-white"
+                  sourceId={subscription.id}
+                  fallbackIcon={<ImageIcon className="h-8 w-8 text-gray-400" />}
+                />
+              </div>
             </div>
 
             {/* Title and Status */}

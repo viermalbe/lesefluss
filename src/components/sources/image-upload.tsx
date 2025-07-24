@@ -4,8 +4,9 @@ import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Upload, X, ExternalLink } from 'lucide-react'
+import { Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { uploadImage } from '@/lib/utils/image-utils'
 
 interface ImageUploadProps {
   currentImageUrl?: string
@@ -17,11 +18,6 @@ export function ImageUpload({ currentImageUrl, onImageChange, disabled = false }
   const [imageUrl, setImageUrl] = useState(currentImageUrl || '')
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const handleUrlChange = (url: string) => {
-    setImageUrl(url)
-    onImageChange(url || null)
-  }
 
   const handleFileUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -37,23 +33,21 @@ export function ImageUpload({ currentImageUrl, onImageChange, disabled = false }
     setIsUploading(true)
     
     try {
-      // For now, we'll use a simple base64 data URL
-      // In production, you'd upload to a service like Supabase Storage or Cloudinary
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string
-        handleUrlChange(dataUrl)
+      // Upload to Supabase Storage using our utility function
+      const path = 'uploads' // Store in uploads folder
+      const imageUrl = await uploadImage(file, path)
+      
+      if (imageUrl) {
+        setImageUrl(imageUrl)
+        onImageChange(imageUrl)
         toast.success('Image uploaded successfully')
-        setIsUploading(false)
-      }
-      reader.onerror = () => {
+      } else {
         toast.error('Failed to upload image')
-        setIsUploading(false)
       }
-      reader.readAsDataURL(file)
     } catch (error) {
       console.error('Upload error:', error)
       toast.error('Failed to upload image')
+    } finally {
       setIsUploading(false)
     }
   }
@@ -65,12 +59,23 @@ export function ImageUpload({ currentImageUrl, onImageChange, disabled = false }
     }
   }
 
-  const handleRemoveImage = () => {
+  const handleRemoveImage = (e: React.MouseEvent) => {
+    // Prevent event bubbling
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Clear local state
     setImageUrl('')
+    
+    // Explicitly pass null to parent component to indicate image removal
     onImageChange(null)
+    
+    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+    
+    console.log('Image removal requested')
   }
 
   return (
@@ -84,9 +89,11 @@ export function ImageUpload({ currentImageUrl, onImageChange, disabled = false }
             src={imageUrl} 
             alt="Source preview" 
             className="w-20 h-20 object-cover rounded border border-gray-200"
-            onError={() => {
+            onError={(e) => {
               toast.error('Failed to load image')
-              handleRemoveImage()
+              // Create a synthetic event for handleRemoveImage
+              const syntheticEvent = new Event('error') as unknown as React.MouseEvent;
+              handleRemoveImage(syntheticEvent)
             }}
           />
           <Button
@@ -94,7 +101,7 @@ export function ImageUpload({ currentImageUrl, onImageChange, disabled = false }
             variant="destructive"
             size="sm"
             className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-            onClick={handleRemoveImage}
+            onClick={(e) => handleRemoveImage(e)}
             disabled={disabled}
           >
             <X className="h-3 w-3" />
@@ -102,36 +109,11 @@ export function ImageUpload({ currentImageUrl, onImageChange, disabled = false }
         </div>
       )}
 
-      {/* URL Input */}
-      <div className="space-y-2">
-        <Label htmlFor="image-url" className="text-sm">Image URL</Label>
-        <div className="flex gap-2">
-          <Input
-            id="image-url"
-            type="url"
-            placeholder="https://example.com/image.jpg"
-            value={imageUrl}
-            onChange={(e) => handleUrlChange(e.target.value)}
-            disabled={disabled}
-            className="flex-1"
-          />
-          {imageUrl && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(imageUrl, '_blank')}
-              disabled={disabled}
-            >
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </div>
+      {/* URL Input removed - only file upload now */}
 
       {/* File Upload */}
       <div className="space-y-2">
-        <Label className="text-sm">Or upload an image</Label>
+        <Label className="text-sm">Upload an image</Label>
         <div className="flex gap-2">
           <Input
             ref={fileInputRef}

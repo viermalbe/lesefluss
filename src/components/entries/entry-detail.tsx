@@ -26,9 +26,12 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
   const [entry, setEntry] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showNavBar, setShowNavBar] = useState(true)
+  const [isAtBottom, setIsAtBottom] = useState(false)
   
   // Einfache Scroll-Position-Wiederherstellung mit sessionStorage
   const scrollPositionKey = `scroll-position-${entryId}`
+  const footerVisibilityThreshold = 100 // Pixel vom unteren Rand
 
   // Fetch entry by ID and automatically mark as read
   const fetchEntry = async () => {
@@ -218,25 +221,44 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     }
   }, [isLoading, entry, scrollPositionKey])
   
-  // Scroll-Position speichern beim Scrollen
+  // Scroll-Position speichern und Navigationsleiste steuern
   useEffect(() => {
     if (!isLoading && entry) {
       const handleScroll = () => {
         try {
+          // Scroll-Position speichern
           sessionStorage.setItem(scrollPositionKey, window.scrollY.toString())
+          
+          // Navigationsleiste ein-/ausblenden basierend auf Scroll-Position
+          const windowHeight = window.innerHeight;
+          const documentHeight = document.documentElement.scrollHeight;
+          const scrollTop = window.scrollY;
+          const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
+          
+          // Wenn wir nahe am Ende sind, blenden wir die Navigationsleiste aus
+          if (distanceFromBottom < footerVisibilityThreshold) {
+            setShowNavBar(false);
+            setIsAtBottom(true);
+          } else {
+            setShowNavBar(true);
+            setIsAtBottom(false);
+          }
         } catch (err) {
-          console.error('Error saving scroll position:', err)
+          console.error('Error in scroll handler:', err)
         }
       }
       
       // Event-Listener mit Passive-Option für bessere Performance
       window.addEventListener('scroll', handleScroll, { passive: true })
       
+      // Initial check
+      handleScroll();
+      
       return () => {
         window.removeEventListener('scroll', handleScroll)
       }
     }
-  }, [isLoading, entry, scrollPositionKey])
+  }, [isLoading, entry, scrollPositionKey, footerVisibilityThreshold])
 
   if (isLoading) {
     return (
@@ -275,11 +297,17 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     )
   }
 
+  // Dieser useEffect wurde entfernt, da er doppelt war
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Sticky header with navigation and actions */}
-      <div className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div className={`min-h-screen bg-background ${isAtBottom ? '' : 'pb-16'}`}>
+      {/* Sticky footer with navigation and actions - hidden when at bottom */}
+      <div 
+        className={`fixed bottom-0 left-0 right-0 z-50 bg-background/95 border-t border-gray-900 backdrop-blur-md transition-transform duration-300 ${
+          showNavBar ? 'translate-y-0' : 'translate-y-full'
+        }`}
+      >
+        <div className="container max-w-4xl mx-auto px-4 py-2 flex items-center justify-between">
           <Button variant="ghost" size="sm" onClick={() => router.back()} className="bg-transparent hover:bg-gray-100">
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back

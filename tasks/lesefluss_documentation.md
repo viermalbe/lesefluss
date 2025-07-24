@@ -1,0 +1,17 @@
+## password
+)6YhAa9tPcNocYQs
+
+## project url
+https://fdjhogxokxibqsauhrvy.supabase.co
+
+## API key
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkamhvZ3hva3hpYnFzYXVocnZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMwMjQ0MTcsImV4cCI6MjA2ODYwMDQxN30.s-YpfKDZQap3_xfugz0KRtWJRvOEh71lJ6tL545Ut3s
+
+## Secret key
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkamhvZ3hva3hpYnFzYXVocnZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzAyNDQxNywiZXhwIjoyMDY4NjAwNDE3fQ.Cl6ZJlPbPtSF6BzY5EpY8JFGuCZDuwzAFZKs5pQ4AOI
+
+
+
+
+uxu2yzvp7p@kill-the-newsletter.com
+https://kill-the-newsletter.com/feeds/uxu2yzvp7p.xml

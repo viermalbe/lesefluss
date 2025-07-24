@@ -14,9 +14,9 @@ export function MainLayout({ children }: MainLayoutProps) {
       </main>
       
       <footer className="border-t mt-auto">
-        <div className="container mx-auto px-4 py-6">
+        <div className="container mx-auto px-4 py-5">
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <p>&copy; 2025 Lesefluss - your personal newsletter reader</p>
+            <p>&copy; 2025 Lesefluss</p>
             <div className="flex items-center space-x-4">
               <a href="#" className="hover:text-foreground transition-colors">
                 Privacy

@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { parseNewsletterHtml } from '@/lib/utils/newsletter-parser'
 import DOMPurify from 'dompurify'
 import './newsletter-viewer.css'
+import { getImageProxyUrl } from '@/lib/utils/image-utils'
 
 export interface NewsletterViewerProps {
   /**
@@ -77,6 +78,7 @@ export function NewsletterViewer({
   className = ''
 }: NewsletterViewerProps) {
   const [transformedContent, setTransformedContent] = useState<string>('')
+  const contentRef = useRef<HTMLDivElement>(null)
   
   useEffect(() => {
     if (!htmlContent) {
@@ -113,6 +115,34 @@ export function NewsletterViewer({
     wrapInContainer
   ])
   
+  // Effect to optimize images after content is rendered
+  useEffect(() => {
+    if (contentRef.current && transformedContent) {
+      // Find all images with the newsletter-img class
+      const images = contentRef.current.querySelectorAll('img.newsletter-img');
+      
+      // Replace each image src with the proxy URL
+      images.forEach((img) => {
+        const originalSrc = img.getAttribute('src');
+        if (originalSrc && !originalSrc.includes('/api/image-proxy')) {
+          // Only proxy external images
+          if (originalSrc.startsWith('http')) {
+            // Ensure originalSrc is not null before passing to getImageProxyUrl
+            const proxyUrl = getImageProxyUrl(originalSrc || '');
+            if (proxyUrl) {
+              img.setAttribute('src', proxyUrl);
+            }
+            
+            // Add loading="lazy" for better performance if not already set
+            if (!img.getAttribute('loading')) {
+              img.setAttribute('loading', 'lazy');
+            }
+          }
+        }
+      });
+    }
+  }, [transformedContent]);
+
   return (
     <div 
       className={`newsletter-viewer ${className}`}
@@ -123,6 +153,7 @@ export function NewsletterViewer({
     >
       {transformedContent ? (
         <div 
+          ref={contentRef}
           className="newsletter-content"
           dangerouslySetInnerHTML={{ __html: transformedContent }}
         />
