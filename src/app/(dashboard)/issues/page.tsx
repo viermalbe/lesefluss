@@ -256,8 +256,8 @@ function IssuesPageContent() {
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Your Issues</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-3xl font-bold text-foreground">Your Issues</h1>
+        <p className="text-muted-foreground mt-1">
           {filteredEntries.length > 0 ? (
             searchQuery.trim() || statusFilter !== 'all' 
               ? `${filteredEntries.length} of ${entries.length} issues shown`
@@ -269,21 +269,23 @@ function IssuesPageContent() {
       {/* Search and Filter Bar */}
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1 text-sm">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Search issues..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 w-full border-border focus-visible:ring-ring"
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="All Issues" />
+            <SelectTrigger className="w-full sm:w-[180px] border-border">
+              <div className="flex items-center">
+                <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="All Issues" />
+              </div>
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-popover border-border">
               <SelectItem value="all">All Issues</SelectItem>
               <SelectItem value="unread">New</SelectItem>
               <SelectItem value="favorites">Liked</SelectItem>
@@ -302,10 +304,9 @@ function IssuesPageContent() {
         <div className="text-center py-16">
           <div className="max-w-md mx-auto">
             <BookOpen className="mx-auto h-16 w-16 text-gray-400 mb-6" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">No issues found</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-3">Nothing to see here!</h3>
             <p className="text-gray-600 mb-6 leading-relaxed">
-              Add some newsletter sources to see your issues here! Once you subscribe to newsletters, 
-              they'll appear as beautiful cards with previews.
+              Awesome! You are up to date. 
             </p>
             <Link href="/sources">
               <Button size="lg" className="px-6">
@@ -331,10 +332,35 @@ function IssuesPageContent() {
   )
 }
 
+// Lazy loading Komponente für bessere Performance
+const LazyIssuesContent = () => {
+  // Verwende useEffect, um clientseitige Hydration zu verbessern
+  const [isClient, setIsClient] = useState(false)
+  
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+  
+  if (!isClient) {
+    return null
+  }
+  
+  return <IssuesPageContent />
+}
+
 export default function IssuesPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center py-12"><div className="text-lg">Loading...</div></div>}>
-      <IssuesPageContent />
+    <Suspense fallback={
+      <div className="container mx-auto py-8">
+        <div className="flex items-center justify-center py-12 flex-col gap-4">
+          <div className="animate-spin">
+            <RefreshCw className="h-8 w-8 text-primary" />
+          </div>
+          <div className="text-lg font-medium">Lade Beiträge...</div>
+        </div>
+      </div>
+    }>
+      <LazyIssuesContent />
     </Suspense>
   )
 }

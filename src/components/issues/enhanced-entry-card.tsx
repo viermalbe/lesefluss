@@ -1,11 +1,13 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Clock, Calendar, Heart, Archive } from 'lucide-react'
+import { Clock, Calendar, Heart, Inbox } from 'lucide-react'
 import { getRelativeTime, getEstimatedReadingTime } from '@/lib/utils/content-utils'
 import { OptimizedImage } from '@/components/ui/optimized-image'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { Card, CardContent } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 interface EnhancedEntryCardProps {
   entry: {
@@ -138,38 +140,36 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
   }
 
   return (
-    <div 
-      className={`bg-card rounded-lg transition-all duration-200 border hover:shadow-md cursor-pointer group ${
-        entry.status === 'read' ? 'border-gray-300' : ''
-      }`}
+    <Card
+      className={cn(
+        entry.status === 'unread' ? 'border-primary' : 'border-border'
+      )}
       onClick={handleCardClick}
     >
-      <div className="p-4 relative">
+      <CardContent className="relative">
         {/* Action Icons - Top right corner */}
-        <div className="absolute top-3 right-3 flex gap-1 z-10">
+        <div className="absolute -top-2 right-4 flex gap-1 z-10">
           {/* Archive Icon */}
           <button
             onClick={handleToggleArchived}
-            className={`p-1 hover:opacity-80 transition-opacity ${
-              entry.archived ? 'text-gray-900' : 'text-slate-400'
+            className={`rounded-md p-1 hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors ${
+              entry.archived ? 'text-primary' : 'text-muted-foreground'
             }`}
             title={entry.archived ? 'Unarchive' : 'Archive'}
           >
-            <Archive className={`w-4 h-4 ${
-              entry.archived ? 'fill-slate-400' : ''
-            }`} />
+            <Inbox className="w-4 h-4" />
           </button>
           
           {/* Heart Icon for Favorites */}
           <button
             onClick={handleToggleStarred}
-            className={`p-1 hover:opacity-80 transition-opacity ${
-              entry.starred ? 'text-pink-500' : 'text-gray-400'
+            className={`rounded-md p-1 hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors ${
+              entry.starred ? 'text-primary' : 'text-muted-foreground'
             }`}
             title={entry.starred ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Heart className={`w-4 h-4 ${
-              entry.starred ? 'fill-pink-600' : ''
+              entry.starred ? 'fill-primary dark:fill-primary' : ''
             }`} />
           </button>
         </div>
@@ -177,25 +177,25 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
         {/* Main Content Layout */}
         <div className="flex gap-3 mb-0">
           {/* Preview Image - 64x64 */}
-          <div className="w-16 h-16 overflow-hidden flex-shrink-0 rounded">
+          <div className="w-12 h-12 overflow-hidden flex-shrink-0 rounded-md">
             <OptimizedImage 
               src={entry.subscription.image_url || getFirstImageFromHtml(entry.content_html)}
               alt={entry.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
               sourceId={entry.subscription.id}
             />
           </div>
           
           {/* Content - Source and Title */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0" data-component-name="EnhancedEntryCard">
             
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1" data-component-name="EnhancedEntryCard">
               {entry.subscription.title}
             </div>
             
             <h3 className={`text-base line-clamp-2 leading-tight ${
-              entry.status === 'read' ? 'text-gray-600' : 'text-gray-900 font-medium'
-            }`}>
+              entry.status === 'read' ? 'text-muted-foreground' : 'text-foreground font-medium'
+            }`} data-component-name="EnhancedEntryCard">
               {entry.title}
             </h3>
           </div>
@@ -205,8 +205,8 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
         <div className="space-y-3">
           
           {/* Meta Information with Status Badge */}
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-3 text-sm text-gray-500">
+          <div className="flex items-center justify-between pt-4" data-component-name="EnhancedEntryCard">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
                 <span>{relativeTime}</span>
@@ -222,15 +222,15 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
               onClick={handleToggleRead}
               className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${
                 isUnread 
-                  ? 'bg-black text-white hover:bg-gray-800' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90 dark:hover:bg-primary/80' 
+                  : 'bg-muted text-muted-foreground hover:bg-muted/70 dark:hover:bg-muted/50'
               }`}
             >
               {isUnread ? 'NEW' : 'OPENED'}
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

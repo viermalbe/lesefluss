@@ -125,7 +125,7 @@ export function SourceCard({ subscription, issueCount = 0, latestIssueDate, week
   const getStatusColor = () => {
     switch (subscription.status) {
       case 'active': return 'bg-green-500'
-      case 'paused': return 'bg-yellow-500'
+      case 'paused': return 'bg-rose-500'
       case 'error': return 'bg-red-500'
       default: return 'bg-gray-500'
     }
@@ -135,21 +135,21 @@ export function SourceCard({ subscription, issueCount = 0, latestIssueDate, week
 
   return (
     <>
-      <Card className={`hover:shadow-lg transition-all duration-200 overflow-hidden ${
-        isPaused ? 'border-gray-300' : ''
+      <Card className={`py-6 overflow-hidden ${
+        isPaused ? 'border-primary' : 'border-border'
       }`}>
-        <CardContent className="p-6">
+        <CardContent className="">
           {/* Header with Cover Image and Title */}
           <div className="flex items-start gap-4 mb-4">
             {/* Cover Image - Not clickable anymore */}
             <div className="flex-shrink-0">
-              <div className="w-16 h-16 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
                 <OptimizedImage 
                   src={subscription.image_url}
                   alt={subscription.title}
                   className="w-full h-full object-contain bg-white"
                   sourceId={subscription.id}
-                  fallbackIcon={<ImageIcon className="h-8 w-8 text-gray-400" />}
+                  fallbackIcon={<ImageIcon className="h-8 w-8 text-muted-foreground/70" />}
                 />
               </div>
             </div>
@@ -158,20 +158,20 @@ export function SourceCard({ subscription, issueCount = 0, latestIssueDate, week
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-gray-900 truncate">
+                  <h3 className="text-lg font-semibold text-card-foreground truncate">
                     {subscription.title}
                   </h3>
                   {/* Status - Clickable */}
                   <button
                     onClick={handleToggleStatus}
-                    className={`text-sm font-medium mt-1 hover:underline transition-colors rounded-md px-1 py-0.5 -mx-1 ${
-                      subscription.status === 'active' ? 'text-green-600 hover:text-green-700 hover:bg-green-50' :
-                      subscription.status === 'paused' ? 'text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50' :
-                      'text-red-600 hover:text-red-700 hover:bg-red-50'
+                    className={`text-sm font-medium rounded-md px-1 py-0.5 transition-colors ${
+                      subscription.status === 'active' ? 'text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30' :
+                      subscription.status === 'paused' ? 'text-rose-600 hover:text-rose-700 dark:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30' :
+                      'text-red-600 hover:text-red-700 dark:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30'
                     }`}
                   >
-                    {subscription.status === 'active' ? '● Active' :
-                     subscription.status === 'paused' ? '● Paused' :
+                    {subscription.status === 'active' ? 'Active' :
+                     subscription.status === 'paused' ? 'Paused' :
                      '● Error'}
                   </button>
                 </div>
@@ -183,7 +183,7 @@ export function SourceCard({ subscription, issueCount = 0, latestIssueDate, week
                   onClick={() => setIsSettingsOpen(true)}
                   className="opacity-60 hover:opacity-100 transition-opacity"
                 >
-                  <Settings className="h-4 w-4" />
+                  <Settings className="h-6 w-6" />
                 </Button>
               </div>
             </div>
@@ -194,21 +194,21 @@ export function SourceCard({ subscription, issueCount = 0, latestIssueDate, week
             {/* Issues Count - Clickable */}
             <button
               onClick={handleFilterBySource}
-              className="flex items-center gap-2 text-gray-700 hover:text-blue-600 transition-colors rounded-md px-2 py-1 -mx-2 -my-1 hover:bg-blue-50"
+              className="flex items-center gap-2 text-foreground hover:text-primary transition-colors rounded-md px-2 py-1 -mx-2 -my-1 hover:bg-primary/10"
             >
-              <BarChart3 className="h-4 w-4 text-gray-500 transition-colors" />
+              <BarChart3 className="h-4 w-4 text-muted-foreground transition-colors" />
               <div>
                 <span className="font-medium">{stats.totalIssues}</span>
-                <span className="text-gray-600 ml-1 transition-colors">Issues</span>
+                <span className="text-muted-foreground ml-1 transition-colors">Issues</span>
               </div>
             </button>
             
             {/* Weekly Average */}
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
+              <Calendar className="h-4 w-4 text-muted-foreground" />
               <div>
                 <span className="font-medium">{stats.weeklyAverage}</span>
-                <span className="text-gray-600 ml-1">/week</span>
+                <span className="text-muted-foreground ml-1">/week</span>
               </div>
             </div>
             
@@ -216,10 +216,10 @@ export function SourceCard({ subscription, issueCount = 0, latestIssueDate, week
             {stats.lastIssueDate && (
               <button
                 onClick={handleOpenLatestIssue}
-                className="flex items-center gap-2 text-gray-700 hover:text-blue-600 transition-colors rounded-md px-2 py-1 -mx-2 -my-1 hover:bg-blue-50"
+                className="flex items-center gap-2 text-foreground hover:text-primary transition-colors rounded-md px-2 py-1 -mx-2 -my-1 hover:bg-primary/10"
               >
-                <Clock className="h-4 w-4 text-gray-500 transition-colors" />
-                <span className="text-gray-600 transition-colors">
+                <Clock className="h-4 w-4 text-muted-foreground transition-colors" />
+                <span className="text-muted-foreground transition-colors">
                   {getRelativeTime(stats.lastIssueDate)}
                 </span>
               </button>
@@ -228,7 +228,7 @@ export function SourceCard({ subscription, issueCount = 0, latestIssueDate, week
 
           {/* Description (if available) */}
           {stats.description && (
-            <p className="text-sm text-gray-700 mb-4 line-clamp-2">
+            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
               {stats.description}
             </p>
           )}

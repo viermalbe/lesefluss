@@ -323,7 +323,7 @@ export function SourceSettingsModal({
                           <img 
                             src={editImageUrl} 
                             alt="Preview" 
-                            className="w-16 h-16 object-cover rounded border border-gray-200"
+                            className="w-16 h-16 object-contain rounded border border-gray-200"
                             onError={() => {
                               toast.error('Failed to load image');
                               setEditImageUrl('');
@@ -411,7 +411,7 @@ export function SourceSettingsModal({
                   <img 
                     src={subscription.image_url} 
                     alt={subscription.title} 
-                    className="w-12 h-12 object-cover rounded border"
+                    className="w-12 h-12 object-contain rounded border"
                     onError={() => {
                       toast.error('Failed to load image');
                     }}

@@ -11,7 +11,9 @@ import { api } from '@/lib/trpc/client'
 import { supabase } from '@/lib/supabase/client'
 import { parseFeed, generateGuidHash } from '@/lib/services/feed-parser'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, Plus } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { RefreshCw, Plus, Search, Filter } from 'lucide-react'
 
 export default function SourcesPage() {
   const { user, loading } = useAuth()
@@ -23,6 +25,8 @@ export default function SourcesPage() {
   const [latestIssueDates, setLatestIssueDates] = useState<Record<string, string>>({})
   const [weeklyAverages, setWeeklyAverages] = useState<Record<string, number>>({})
   const [isSyncing, setIsSyncing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   
   // Scroll position management
   const { restorePosition, setupAutoSave } = useScrollPosition('sources-page')
@@ -386,7 +390,37 @@ export default function SourcesPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-8">Your Sources</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Your Sources</h1>
+        <p className="text-muted-foreground mb-6">
+          {subscriptions.length > 0 ? `${subscriptions.length} source${subscriptions.length === 1 ? '' : 's'} available` : 'No sources yet'}
+        </p>
+        
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search sources..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-full border-border focus-visible:ring-ring"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[180px] border-border">
+              <div className="flex items-center">
+                <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="All Sources" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border">
+              <SelectItem value="all">All Sources</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="paused">Paused</SelectItem>
+              <SelectItem value="error">Error</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
         <div className="flex justify-end gap-2">
           <Button
             variant="outline"
@@ -427,17 +461,34 @@ export default function SourcesPage() {
         <>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {subscriptions.map((subscription) => (
-              <SourceCard
-                key={subscription.id}
-                subscription={subscription}
-                issueCount={issueCounts[subscription.id] || 0}
-                latestIssueDate={latestIssueDates[subscription.id]}
-                weeklyAverage={weeklyAverages[subscription.id] || 0}
-                onUpdate={loadSubscriptions}
-                onDelete={handleDelete}
-              />
-            ))}
+            {subscriptions
+              .filter(subscription => {
+                // Status filter
+                if (statusFilter !== 'all' && subscription.status !== statusFilter) {
+                  return false;
+                }
+                
+                // Search filter
+                if (searchQuery.trim()) {
+                  const query = searchQuery.toLowerCase();
+                  return subscription.title.toLowerCase().includes(query) || 
+                         subscription.description?.toLowerCase().includes(query) ||
+                         subscription.email?.toLowerCase().includes(query);
+                }
+                
+                return true;
+              })
+              .map((subscription) => (
+                <SourceCard
+                  key={subscription.id}
+                  subscription={subscription}
+                  issueCount={issueCounts[subscription.id] || 0}
+                  latestIssueDate={latestIssueDates[subscription.id]}
+                  weeklyAverage={weeklyAverages[subscription.id] || 0}
+                  onUpdate={loadSubscriptions}
+                  onDelete={handleDelete}
+                />
+              ))}
           </div>
         </>
       )}

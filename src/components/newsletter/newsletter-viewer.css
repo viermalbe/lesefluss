@@ -78,6 +78,16 @@
   height: auto;
 }
 
+/* Links mit korrektem Wortumbruch */
+.newsletter-wrapper a,
+.newsletter-content a {
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  hyphens: auto !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+}
+
 /* Responsive Bilder mit Aspect-Ratio-Erhaltung */
 .newsletter-image {
   max-width: 100%;

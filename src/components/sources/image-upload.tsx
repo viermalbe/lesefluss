@@ -88,7 +88,7 @@ export function ImageUpload({ currentImageUrl, onImageChange, disabled = false }
           <img 
             src={imageUrl} 
             alt="Source preview" 
-            className="w-20 h-20 object-cover rounded border border-gray-200"
+            className="w-20 h-20 object-contain rounded border border-gray-200"
             onError={(e) => {
               toast.error('Failed to load image')
               // Create a synthetic event for handleRemoveImage

@@ -27,7 +27,9 @@ interface Entry {
   }
 }
 
-export default function ArchivePage() {
+import { Suspense } from 'react'
+
+function ArchivePageContent() {
   const { user, loading: userLoading } = useAuth()
   
   // Scroll position management
@@ -229,8 +231,8 @@ export default function ArchivePage() {
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Archive</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-3xl font-bold text-foreground">Archive</h1>
+        <p className="text-muted-foreground mt-1">
           {filteredEntries.length > 0 ? (
             searchQuery.trim() || statusFilter !== 'all' 
               ? `${filteredEntries.length} of ${entries.length} archived issues shown`
@@ -299,5 +301,38 @@ export default function ArchivePage() {
         </div>
       )}
     </div>
+  )
+}
+
+// Lazy loading Komponente für bessere Performance
+function LazyArchiveContent() {
+  // Verwende useEffect, um clientseitige Hydration zu verbessern
+  const [isClient, setIsClient] = useState(false)
+  
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+  
+  if (!isClient) {
+    return null
+  }
+  
+  return <ArchivePageContent />
+}
+
+export default function ArchivePage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto py-8">
+        <div className="flex items-center justify-center py-12 flex-col gap-4">
+          <div className="animate-spin">
+            <Loader2 className="h-8 w-8 text-primary" />
+          </div>
+          <div className="text-lg font-medium">Lade archivierte Beiträge...</div>
+        </div>
+      </div>
+    }>
+      <LazyArchiveContent />
+    </Suspense>
   )
 }

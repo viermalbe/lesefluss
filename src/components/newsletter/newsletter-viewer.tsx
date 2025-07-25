@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { parseNewsletterHtml } from '@/lib/utils/newsletter-parser'
 import DOMPurify from 'dompurify'
 import './newsletter-viewer.css'
+import '@/styles/newsletter-responsive.css'
 import { getImageProxyUrl } from '@/lib/utils/image-utils'
 
 export interface NewsletterViewerProps {

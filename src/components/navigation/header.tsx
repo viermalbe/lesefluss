@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuthContext } from '@/components/providers/auth-provider'
 import { AddSourceDialog } from '@/components/sources/add-source-dialog'
-import { BookOpen, Menu as MenuIcon, Plus, Settings, User, LogOut, Archive, X } from 'lucide-react'
+import { BookOpen, Signature, Menu as MenuIcon, Plus, Settings, User, LogOut, Inbox, X } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,17 +30,17 @@ export function Header() {
 
   const navigation = [
     { name: 'Issues', href: '/issues', icon: BookOpen },
-    { name: 'Archive', href: '/archive', icon: Archive },
+    { name: 'Archive', href: '/archive', icon: Inbox },
     { name: 'Sources', href: '/sources', icon: MenuIcon },
   ]
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full bg-background">
       <div className="container mx-auto flex h-14 items-center px-4">
         {/* Logo */}
         <div className="mr-4 flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <BookOpen className="h-6 w-6" />
+            <Signature className="h-6 w-6" />
             <span className="font-bold">
               Lesefluss
             </span>
@@ -125,7 +125,7 @@ export function Header() {
                 <div className="p-6 border-b">
                   <SheetHeader>
                     <SheetTitle className="flex items-center">
-                      <BookOpen className="h-5 w-5 mr-2" />
+                      <Signature className="h-5 w-5 mr-2" />
                       Lesefluss
                     </SheetTitle>
                     {user && (

@@ -253,6 +253,7 @@
 @media (prefers-color-scheme: dark) {
   .newsletter-wrapper {
     color: hsl(var(--foreground)) !important;
+    background-color: transparent !important;
   }
   
   .newsletter-wrapper p,
@@ -265,11 +266,117 @@
   .newsletter-wrapper a {
     color: hsl(var(--primary)) !important;
   }
+  
+  /* Adjust backgrounds for better readability */
+  .newsletter-wrapper [style*="background"],
+  .newsletter-wrapper [bgcolor] {
+    background-color: transparent !important;
+  }
+  
+  /* Ensure all text is visible in dark mode - comprehensive grayscale handling */
+  .newsletter-wrapper [style*="color: #"],
+  .newsletter-wrapper [style*="color:#"] {
+    color: hsl(var(--foreground)) !important;
+  }
+  
+  /* Preserve specific colors we want to keep */
+  .newsletter-wrapper [style*="color: #f"],
+  .newsletter-wrapper [style*="color: #e"],
+  .newsletter-wrapper [style*="color: #d"],
+  .newsletter-wrapper [style*="color: #c"],
+  .newsletter-wrapper [style*="color: #b"],
+  .newsletter-wrapper [style*="color: #a"],
+  .newsletter-wrapper [style*="color:#f"],
+  .newsletter-wrapper [style*="color:#e"],
+  .newsletter-wrapper [style*="color:#d"],
+  .newsletter-wrapper [style*="color:#c"],
+  .newsletter-wrapper [style*="color:#b"],
+  .newsletter-wrapper [style*="color:#a"] {
+    /* Let these colors pass through without override */
+    color: inherit !important;
+  }
+  
+  /* Re-apply foreground color to dark grayscale colors */
+  .newsletter-wrapper [style*="color: #0"],
+  .newsletter-wrapper [style*="color: #1"],
+  .newsletter-wrapper [style*="color: #2"],
+  .newsletter-wrapper [style*="color: #3"],
+  .newsletter-wrapper [style*="color: #4"],
+  .newsletter-wrapper [style*="color: #5"],
+  .newsletter-wrapper [style*="color: #6"],
+  .newsletter-wrapper [style*="color: #7"],
+  .newsletter-wrapper [style*="color: #8"],
+  .newsletter-wrapper [style*="color: #9"],
+  .newsletter-wrapper [style*="color:#0"],
+  .newsletter-wrapper [style*="color:#1"],
+  .newsletter-wrapper [style*="color:#2"],
+  .newsletter-wrapper [style*="color:#3"],
+  .newsletter-wrapper [style*="color:#4"],
+  .newsletter-wrapper [style*="color:#5"],
+  .newsletter-wrapper [style*="color:#6"],
+  .newsletter-wrapper [style*="color:#7"],
+  .newsletter-wrapper [style*="color:#8"],
+  .newsletter-wrapper [style*="color:#9"] {
+    color: hsl(var(--foreground)) !important;
+  }
+  
+  /* Preserve light backgrounds with dark text */
+  .newsletter-wrapper [style*="background-color: #fff"],
+  .newsletter-wrapper [style*="background-color: white"],
+  .newsletter-wrapper [style*="background-color: #ffffff"],
+  .newsletter-wrapper [style*="background: #fff"],
+  .newsletter-wrapper [style*="background: white"],
+  .newsletter-wrapper [style*="background: #ffffff"],
+  .newsletter-wrapper [bgcolor="#ffffff"],
+  .newsletter-wrapper [bgcolor="white"] {
+    background-color: hsl(var(--muted)) !important;
+    color: hsl(var(--muted-foreground)) !important;
+  }
+  
+  /* Handle tables with background colors */
+  .newsletter-wrapper table[style*="background"],
+  .newsletter-wrapper table[bgcolor] {
+    background-color: transparent !important;
+  }
+  
+  /* Improve contrast for borders */
+  .newsletter-wrapper [style*="border"] {
+    border-color: hsl(var(--border)) !important;
+  }
+  
+  /* Improve visibility of dark text on dark backgrounds */
+  .newsletter-wrapper [style*="background-color: #000"],
+  .newsletter-wrapper [style*="background-color: black"],
+  .newsletter-wrapper [style*="background-color: #111"],
+  .newsletter-wrapper [style*="background-color: #222"],
+  .newsletter-wrapper [style*="background-color: #333"],
+  .newsletter-wrapper [style*="background-color: #444"],
+  .newsletter-wrapper [style*="background: #000"],
+  .newsletter-wrapper [style*="background: black"],
+  .newsletter-wrapper [style*="background: #111"],
+  .newsletter-wrapper [style*="background: #222"],
+  .newsletter-wrapper [style*="background: #333"],
+  .newsletter-wrapper [style*="background: #444"],
+  .newsletter-wrapper [bgcolor="#000000"],
+  .newsletter-wrapper [bgcolor="black"],
+  .newsletter-wrapper [bgcolor="#111111"],
+  .newsletter-wrapper [bgcolor="#222222"],
+  .newsletter-wrapper [bgcolor="#333333"],
+  .newsletter-wrapper [bgcolor="#444444"] {
+    background-color: hsl(var(--muted)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+  
+  /* Apply mix-blend-mode for better text visibility */
+  .newsletter-wrapper img {
+    mix-blend-mode: normal;
+  }
 }
 
 /* Force dark mode compatibility */
 .dark .newsletter-wrapper {
   color: hsl(var(--foreground)) !important;
+  background-color: transparent !important;
 }
 
 .dark .newsletter-wrapper p,
@@ -281,6 +388,41 @@
 
 .dark .newsletter-wrapper a {
   color: hsl(var(--primary)) !important;
+}
+
+/* Adjust backgrounds for better readability in dark mode */
+.dark .newsletter-wrapper [style*="background"],
+.dark .newsletter-wrapper [bgcolor] {
+  background-color: transparent !important;
+}
+
+/* Preserve light backgrounds with dark text in dark mode */
+.dark .newsletter-wrapper [style*="background-color: #fff"],
+.dark .newsletter-wrapper [style*="background-color: white"],
+.dark .newsletter-wrapper [style*="background-color: #ffffff"],
+.dark .newsletter-wrapper [style*="background: #fff"],
+.dark .newsletter-wrapper [style*="background: white"],
+.dark .newsletter-wrapper [style*="background: #ffffff"],
+.dark .newsletter-wrapper [bgcolor="#ffffff"],
+.dark .newsletter-wrapper [bgcolor="white"] {
+  background-color: hsl(var(--muted)) !important;
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+/* Handle tables with background colors in dark mode */
+.dark .newsletter-wrapper table[style*="background"],
+.dark .newsletter-wrapper table[bgcolor] {
+  background-color: transparent !important;
+}
+
+/* Improve contrast for borders in dark mode */
+.dark .newsletter-wrapper [style*="border"] {
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Apply mix-blend-mode for better text visibility in dark mode */
+.dark .newsletter-wrapper img {
+  mix-blend-mode: normal;
 }
 
 /* ========================================

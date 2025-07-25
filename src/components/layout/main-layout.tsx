@@ -13,18 +13,20 @@ export function MainLayout({ children }: MainLayoutProps) {
         {children}
       </main>
       
-      <footer className="border-t mt-auto">
-        <div className="container mx-auto px-4 py-5">
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <p>&copy; 2025 Lesefluss</p>
-            <div className="flex items-center space-x-4">
-              <a href="#" className="hover:text-foreground transition-colors">
+      <footer className="bg-background">
+        <div className="container-wrapper px-4 xl:px-6">
+          <div className="flex h-[--footer-height] items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              © {new Date().getFullYear()} Lesefluss
+            </div>
+            <div className="flex items-center gap-4">
+              <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Privacy
               </a>
-              <a href="#" className="hover:text-foreground transition-colors">
+              <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Terms
               </a>
-              <a href="#" className="hover:text-foreground transition-colors">
+              <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Support
               </a>
             </div>

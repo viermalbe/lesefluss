@@ -1,15 +1,24 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useRef } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Calendar, Heart, Archive } from 'lucide-react'
+import { ArrowLeft, Heart, Inbox, ChevronLeft, ChevronRight } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { getRelativeTime } from '@/lib/utils/content-utils'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/hooks'
 import { NewsletterViewer } from '@/components/newsletter/newsletter-viewer'
+import { useNavigationGestures } from '@/lib/hooks/use-navigation-gestures'
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card'
 
 interface EntryDetailProps {
   entryId: string
@@ -21,18 +30,207 @@ interface EntryDetailProps {
  */
 export function EntryDetail({ entryId }: EntryDetailProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const { user } = useAuth()
   const [sanitizedContent, setSanitizedContent] = useState<string>('')
   const [entry, setEntry] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showNavBar, setShowNavBar] = useState(true)
-  const [isAtBottom, setIsAtBottom] = useState(false)
+  const [lastScrollY, setLastScrollY] = useState(0)
+  const [adjacentEntries, setAdjacentEntries] = useState<{
+    previous: string | null;
+    next: string | null;
+    source: 'issues' | 'archive';
+  }>({ previous: null, next: null, source: 'issues' })
+  const [navigationVisible, setNavigationVisible] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
   
   // Einfache Scroll-Position-Wiederherstellung mit sessionStorage
   const scrollPositionKey = `scroll-position-${entryId}`
-  const footerVisibilityThreshold = 100 // Pixel vom unteren Rand
+  
+  // Determine source (issues or archive) from pathname and extract search params
+  const determineSource = (): 'issues' | 'archive' => {
+    return pathname?.includes('/archive/') ? 'archive' : 'issues'
+  }
+  
+  // Extract search and filter parameters from URL
+  const extractSearchParams = (): { searchQuery: string; statusFilter: string } => {
+    // Default values
+    const defaults = { searchQuery: '', statusFilter: 'all' }
+    
+    // If we're not in a browser environment, return defaults
+    if (typeof window === 'undefined') return defaults
+    
+    try {
+      // Get current URL search params
+      const url = new URL(window.location.href)
+      const searchQuery = url.searchParams.get('q') || ''
+      const statusFilter = url.searchParams.get('filter') || 'all'
+      
+      return { searchQuery, statusFilter }
+    } catch (err) {
+      console.error('Error extracting search params:', err)
+      return defaults
+    }
+  }
 
+  // Fetch adjacent entries (previous and next) with filtering
+  const fetchAdjacentEntries = async (currentEntryId: string) => {
+    if (!user) return
+    
+    try {
+      const source = determineSource()
+      const filter = source === 'archive' ? { archived: true } : { archived: false }
+      const { searchQuery, statusFilter } = extractSearchParams()
+      
+      // Verbesserte Abfrage mit korrektem Join für subscriptions
+      // Wir holen mehr Daten für die Client-seitige Filterung
+      const { data: allEntries, error } = await supabase
+        .from('entries')
+        .select(`
+          id, 
+          title, 
+          published_at, 
+          created_at,
+          status,
+          starred,
+          subscription:subscriptions!inner(user_id, title)
+        `)
+        .eq('subscription.user_id', user.id)
+        .eq('archived', filter.archived)
+        .order('published_at', { ascending: false })
+      
+      if (error) {
+        console.error('Error fetching adjacent entries:', error)
+        return
+      }
+      
+      if (!allEntries || allEntries.length === 0) {
+        return
+      }
+      
+      // Wende die gleichen Filter an wie auf der Issues/Archive-Seite
+      const filteredEntries = allEntries.filter(entry => {
+        // Status filter
+        if (statusFilter === 'favorites') {
+          if (!entry.starred) return false
+        } else if (statusFilter !== 'all' && entry.status !== statusFilter) {
+          return false
+        }
+        
+        // Search filter - nur nach Titel und Quelle filtern
+        if (searchQuery.trim()) {
+          const query = searchQuery.toLowerCase()
+          const titleMatch = entry.title?.toLowerCase().includes(query)
+          const sourceMatch = entry.subscription?.title?.toLowerCase().includes(query)
+          
+          return titleMatch || sourceMatch
+        }
+        
+        return true
+      })
+      
+      // Find the index of the current entry in the filtered list
+      const currentIndex = filteredEntries.findIndex(e => e.id === currentEntryId)
+      
+      if (currentIndex === -1) {
+        return
+      }
+      
+      // Get previous and next entry IDs from the filtered list
+      const previousEntry = currentIndex < filteredEntries.length - 1 ? filteredEntries[currentIndex + 1].id : null
+      const nextEntry = currentIndex > 0 ? filteredEntries[currentIndex - 1].id : null
+      
+      setAdjacentEntries({
+        previous: previousEntry,
+        next: nextEntry,
+        source
+      })
+      
+      // Show navigation indicators briefly
+      setNavigationVisible(true)
+      setTimeout(() => setNavigationVisible(false), 2000)
+    } catch (err) {
+      console.error('Error fetching adjacent entries:', err)
+    }
+  }
+  
+  // Navigate to previous or next entry while preserving search params
+  const navigateToEntry = (entryId: string | null) => {
+    if (!entryId) return
+    
+    const source = determineSource()
+    const { searchQuery, statusFilter } = extractSearchParams()
+    
+    // Baue die URL mit den aktuellen Suchparametern
+    let url = `/${source}/${entryId}`
+    
+    // Füge Suchparameter hinzu, wenn vorhanden
+    const params = new URLSearchParams()
+    if (searchQuery) params.set('q', searchQuery)
+    if (statusFilter !== 'all') params.set('filter', statusFilter)
+    
+    // Füge Parameter zur URL hinzu, wenn vorhanden
+    const queryString = params.toString()
+    if (queryString) url += `?${queryString}`
+    
+    router.push(url)
+  }
+  
+  // Navigate to previous entry
+  const navigateToPrevious = () => {
+    if (adjacentEntries.previous) {
+      navigateToEntry(adjacentEntries.previous)
+    }
+  }
+  
+  // Navigate to next entry
+  const navigateToNext = () => {
+    if (adjacentEntries.next) {
+      navigateToEntry(adjacentEntries.next)
+    }
+  }
+  
+  // Navigate back to list view while preserving search params
+  const navigateBack = () => {
+    const source = adjacentEntries.source
+    const { searchQuery, statusFilter } = extractSearchParams()
+    
+    // Baue die URL mit den aktuellen Suchparametern
+    let url = `/${source}`
+    
+    // Füge Suchparameter hinzu, wenn vorhanden
+    const params = new URLSearchParams()
+    if (searchQuery) params.set('q', searchQuery)
+    if (statusFilter !== 'all') params.set('filter', statusFilter)
+    
+    // Füge Parameter zur URL hinzu, wenn vorhanden
+    const queryString = params.toString()
+    if (queryString) url += `?${queryString}`
+    
+    router.push(url)
+  }
+  
+  // Debug-Ausgabe für die Navigation
+  useEffect(() => {
+    if (adjacentEntries.next || adjacentEntries.previous) {
+      console.log('Navigation verfügbar:', {
+        next: adjacentEntries.next,
+        previous: adjacentEntries.previous,
+        source: adjacentEntries.source
+      })
+    }
+  }, [adjacentEntries])
+  
+  // Setup swipe and keyboard navigation
+  useNavigationGestures({
+    onNext: navigateToNext,
+    onPrevious: navigateToPrevious,
+    onBack: navigateBack,
+    containerRef,
+    enabled: !isLoading && !!entry
+  })
+  
   // Fetch entry by ID and automatically mark as read
   const fetchEntry = async () => {
     if (!user) return
@@ -82,6 +280,9 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
       if (data.status === 'unread') {
         await markAsReadAutomatically(data.id)
       }
+      
+      // Fetch adjacent entries for navigation
+      await fetchAdjacentEntries(data.id)
     } catch (err) {
       console.error('Error in fetchEntry:', err)
       setError('An unexpected error occurred')
@@ -183,6 +384,9 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     if (user) {
       fetchEntry()
     }
+    
+    // Reset navigation visibility when entry changes
+    setNavigationVisible(false)
   }, [user, entryId])
 
   // Sanitize HTML content on client-side
@@ -221,28 +425,17 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     }
   }, [isLoading, entry, scrollPositionKey])
   
-  // Scroll-Position speichern und Navigationsleiste steuern
+  // Scroll-Position speichern
   useEffect(() => {
     if (!isLoading && entry) {
       const handleScroll = () => {
         try {
-          // Scroll-Position speichern
-          sessionStorage.setItem(scrollPositionKey, window.scrollY.toString())
+          // Aktuelle Scroll-Position speichern
+          const currentScrollY = window.scrollY;
+          sessionStorage.setItem(scrollPositionKey, currentScrollY.toString());
           
-          // Navigationsleiste ein-/ausblenden basierend auf Scroll-Position
-          const windowHeight = window.innerHeight;
-          const documentHeight = document.documentElement.scrollHeight;
-          const scrollTop = window.scrollY;
-          const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
-          
-          // Wenn wir nahe am Ende sind, blenden wir die Navigationsleiste aus
-          if (distanceFromBottom < footerVisibilityThreshold) {
-            setShowNavBar(false);
-            setIsAtBottom(true);
-          } else {
-            setShowNavBar(true);
-            setIsAtBottom(false);
-          }
+          // Scroll-Position für Animation der Navigationsleiste aktualisieren
+          setLastScrollY(currentScrollY);
         } catch (err) {
           console.error('Error in scroll handler:', err)
         }
@@ -258,41 +451,39 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
         window.removeEventListener('scroll', handleScroll)
       }
     }
-  }, [isLoading, entry, scrollPositionKey, footerVisibilityThreshold])
+  }, [isLoading, entry, scrollPositionKey])
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
+      <div className="container mx-auto px-0 sm:px-4 md:px-6 py-4 sm:max-w-4xl">
+        <Card className="shadow-sm rounded-none sm:rounded-lg">
+          <CardContent className="flex items-center justify-center min-h-[400px]">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   if (error || !entry) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-4xl mx-auto">
-          <div className="sm:p-6">
-            <div className="sm:bg-card sm:border sm:rounded-lg sm:shadow-sm">
-              <div className="p-4 sm:p-6 border-b">
-                <Button variant="ghost" size="sm" onClick={() => router.back()} className="-ml-2">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back
-                </Button>
-              </div>
-              <div className="p-4 sm:p-6">
-                <div className="text-center py-12">
-                  <h2 className="text-xl font-semibold mb-2">Entry not found</h2>
-                  <p className="text-muted-foreground mb-4">
-                    The requested newsletter entry could not be loaded.
-                  </p>
-                </div>
-              </div>
+      <div className="container mx-auto px-0 sm:px-4 md:px-6 py-4 sm:max-w-4xl">
+        <Card className="shadow-sm rounded-none sm:rounded-lg">
+          <CardHeader>
+            <Button variant="ghost" size="sm" onClick={() => router.back()} className="-ml-2 mb-2">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-12">
+              <h2 className="text-xl font-semibold mb-2">Entry not found</h2>
+              <p className="text-muted-foreground mb-4">
+                The requested newsletter entry could not be loaded.
+              </p>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -300,95 +491,105 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
   // Dieser useEffect wurde entfernt, da er doppelt war
 
   return (
-    <div className={`min-h-screen bg-background ${isAtBottom ? '' : 'pb-16'}`}>
-      {/* Sticky footer with navigation and actions - hidden when at bottom */}
-      <div 
-        className={`fixed bottom-0 left-0 right-0 z-50 bg-background/95 border-t border-gray-900 backdrop-blur-md transition-transform duration-300 ${
-          showNavBar ? 'translate-y-0' : 'translate-y-full'
-        }`}
-      >
-        <div className="container max-w-4xl mx-auto px-4 py-2 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="bg-transparent hover:bg-gray-100">
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Back
-          </Button>
-          
-          <div className="flex items-center gap-4">
-            {/* Archive Button */}
-            <button
-              onClick={toggleArchivedStatus}
-              className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
-                entry?.archived ? 'text-gray-900' : 'text-gray-500'
-              }`}
-              title={entry?.archived ? 'Remove from archive' : 'Archive'}
-            >
-              <Archive className={`w-5 h-5 ${entry?.archived ? 'fill-gray-400' : ''}`} />
-            </button>
-            
-            {/* Like Button */}
-            <button
-              onClick={toggleStarredStatus}
-              className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
-                entry?.starred ? 'text-rose-500' : 'text-gray-500'
-              }`}
-              title={entry?.starred ? 'Remove from likes' : 'Add to likes'}
-            >
-              <Heart className={`w-5 h-5 ${entry?.starred ? 'fill-rose-500' : ''}`} />
-            </button>
-          </div>
-        </div>
+    <div className="min-h-screen pb-16" ref={containerRef}>
+      {/* Navigation indicators */}
+      {/* Navigation indicators - mit Klick-Funktionalität */}
+      <div className={`fixed inset-y-0 left-0 z-40 flex items-center transition-opacity duration-300 ${navigationVisible ? 'opacity-50' : 'opacity-0'}`}>
+        {adjacentEntries.previous && (
+          <button 
+            onClick={navigateToPrevious}
+            className="bg-background/80 p-2 rounded-r-full ml-1 hover:bg-background/90 focus:outline-none focus:ring-2 focus:ring-primary"
+            aria-label="Vorheriger Eintrag"
+          >
+            <ChevronLeft className="h-8 w-8" />
+          </button>
+        )}
       </div>
       
-      {/* Mobile-optimized container */}
-      <div className="max-w-4xl mx-auto">
-        {/* Entry content - Mobile: no card, Desktop: with card */}
-        <div className="sm:p-6">
-          {/* Mobile: Direct content, Desktop: Card wrapper */}
-          <div className="sm:bg-card sm:border sm:rounded-lg sm:shadow-sm">
-            {/* Integrated Header with Back Button */}
-            <div className="p-4 sm:p-6 border-b">
-              <div className="space-y-4">
+      <div className={`fixed inset-y-0 right-0 z-40 flex items-center transition-opacity duration-300 ${navigationVisible ? 'opacity-50' : 'opacity-0'}`}>
+        {adjacentEntries.next && (
+          <button 
+            onClick={navigateToNext}
+            className="bg-background/80 p-2 rounded-l-full mr-1 hover:bg-background/90 focus:outline-none focus:ring-2 focus:ring-primary"
+            aria-label="Nächster Eintrag"
+          >
+            <ChevronRight className="h-8 w-8" />
+          </button>
+        )}
+      </div>
+      
+      {/* Sticky header/footer */}
+      <div className="fixed inset-x-0 bottom-0 z-50 bg-background">
+        <div className="container max-w-4xl mx-auto px-4 py-2 flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={navigateBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
 
-                
-                {/* Title and Source */}
-                <h1 className="text-xl sm:text-2xl font-bold mb-0 text-foreground leading-tight">
-                  {entry.title}
-                </h1>
-                
-                <div className="flex items-center gap-2 text-base text-muted-foreground">
-                  <span className="font-medium text-foreground">{entry.subscription.title}</span>
-                  <span className="text-gray-500">•</span>
-                  <span>{getRelativeTime(entry.published_at || entry.created_at)}</span>
-                </div>
-                
-              </div>
-            </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleArchivedStatus}
+              aria-pressed={entry?.archived}
+              title={entry?.archived ? 'Remove from archive' : 'Archive'}
+              className={entry?.archived ? 'text-primary' : ''}
+            >
+              <Inbox className="h-4 w-4" />
+            </Button>
 
-            {/* Content section */}
-            <div className="p-4 sm:p-6">
-              {sanitizedContent ? (
-                <NewsletterViewer 
-                  htmlContent={sanitizedContent}
-                  maxWidth="800px"
-                  preserveOriginalStyles={true}
-                  removeTrackingPixels={true}
-                  makeImagesResponsive={true}
-                  fixTableLayouts={true}
-                  enableDarkMode={true}
-                  wrapInContainer={true}
-                  className="newsletter-view-mode"
-                />
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">
-                    Inhalt wird geladen...
-                  </p>
-                </div>
-              )}
-            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleStarredStatus}
+              aria-pressed={entry?.starred}
+              title={entry?.starred ? 'Remove from likes' : 'Add to likes'}
+              className={entry?.starred ? 'text-red-500' : ''}
+            >
+              <Heart className={`h-4 w-4 ${entry?.starred ? 'fill-current' : ''}`} />
+            </Button>
           </div>
         </div>
       </div>
+
+      {/* Main content */}
+      <div className="container mx-auto px-0 sm:px-4 md:px-6 py-4 sm:max-w-4xl">
+        <Card className="shadow-sm rounded-none sm:rounded-lg">
+          <CardHeader className="space-y-2 px-4 sm:px-6">
+            <CardTitle className="text-xl sm:text-2xl">
+              {entry.title}
+            </CardTitle>
+            <CardDescription className="flex items-center gap-2 text-base">
+              <span className="font-medium text-foreground">
+                {entry.subscription.title}
+              </span>
+              <span>•</span>
+              <span>{getRelativeTime(entry.published_at || entry.created_at)}</span>
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent className="px-4 sm:px-6">
+            {sanitizedContent ? (
+              <NewsletterViewer
+                htmlContent={sanitizedContent}
+                maxWidth="100%"
+                preserveOriginalStyles
+                removeTrackingPixels
+                makeImagesResponsive
+                fixTableLayouts
+                enableDarkMode
+                wrapInContainer
+                className="newsletter-view-mode"
+              />
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Inhalt wird geladen...</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
+
   )
 }
