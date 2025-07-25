@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Heart, Inbox, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Heart, Inbox, ListFilter, X } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { getRelativeTime } from '@/lib/utils/content-utils'
 import { supabase } from '@/lib/supabase/client'
@@ -50,7 +50,11 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
   
   // Determine source (issues or archive) from pathname and extract search params
   const determineSource = (): 'issues' | 'archive' => {
-    return pathname?.includes('/archive/') ? 'archive' : 'issues'
+    // Verbesserte Pfaderkennung für Archive
+    if (pathname?.includes('/archive/') || pathname?.includes('/archive?')) {
+      return 'archive'
+    }
+    return 'issues'
   }
   
   // Extract search and filter parameters from URL
@@ -79,9 +83,28 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     if (!user) return
     
     try {
-      const source = determineSource()
-      const filter = source === 'archive' ? { archived: true } : { archived: false }
+      // Hole zuerst den aktuellen Eintrag, um seinen Archivstatus zu prüfen
+      const { data: currentEntry } = await supabase
+        .from('entries')
+        .select('archived')
+        .eq('id', currentEntryId)
+        .single()
+      
+      // Bestimme die Quelle basierend auf dem Archivstatus des aktuellen Eintrags
+      const isArchived = currentEntry?.archived || false
+      const source = isArchived ? 'archive' : 'issues'
+      const filter = { archived: isArchived }
       const { searchQuery, statusFilter } = extractSearchParams()
+      
+      console.log('Debug navigation:', { 
+        source, 
+        filter, 
+        pathname, 
+        currentEntryId,
+        isArchived,
+        searchQuery, 
+        statusFilter 
+      })
       
       // Verbesserte Abfrage mit korrektem Join für subscriptions
       // Wir holen mehr Daten für die Client-seitige Filterung
@@ -130,16 +153,26 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
         return true
       })
       
+      console.log('Debug filtered entries:', { 
+        filteredEntriesCount: filteredEntries.length,
+        currentEntryId
+      })
+      
       // Find the index of the current entry in the filtered list
       const currentIndex = filteredEntries.findIndex(e => e.id === currentEntryId)
       
+      console.log('Debug current index:', { currentIndex, currentEntryId })
+      
       if (currentIndex === -1) {
+        console.log('Current entry not found in filtered entries')
         return
       }
       
       // Get previous and next entry IDs from the filtered list
       const previousEntry = currentIndex < filteredEntries.length - 1 ? filteredEntries[currentIndex + 1].id : null
       const nextEntry = currentIndex > 0 ? filteredEntries[currentIndex - 1].id : null
+      
+      console.log('Debug adjacent entries:', { previousEntry, nextEntry, source })
       
       setAdjacentEntries({
         previous: previousEntry,
@@ -471,7 +504,6 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
         <Card className="shadow-sm rounded-none sm:rounded-lg">
           <CardHeader>
             <Button variant="ghost" size="sm" onClick={() => router.back()} className="-ml-2 mb-2">
-              <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
           </CardHeader>
@@ -499,7 +531,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
           <button 
             onClick={navigateToPrevious}
             className="bg-background/80 p-2 rounded-r-full ml-1 hover:bg-background/90 focus:outline-none focus:ring-2 focus:ring-primary"
-            aria-label="Vorheriger Eintrag"
+            aria-label="Older entry"
           >
             <ChevronLeft className="h-8 w-8" />
           </button>
@@ -511,7 +543,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
           <button 
             onClick={navigateToNext}
             className="bg-background/80 p-2 rounded-l-full mr-1 hover:bg-background/90 focus:outline-none focus:ring-2 focus:ring-primary"
-            aria-label="Nächster Eintrag"
+            aria-label="Newer entry"
           >
             <ChevronRight className="h-8 w-8" />
           </button>
@@ -521,12 +553,24 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
       {/* Sticky header/footer */}
       <div className="fixed inset-x-0 bottom-0 z-50 bg-background">
         <div className="container max-w-4xl mx-auto px-4 py-2 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={navigateBack}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
+          {/* Previous Button */}
+          <div>
+            {adjacentEntries.previous ? (
+              <Button variant="ghost" size="sm" onClick={navigateToPrevious} title="Older entry">
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Older
+              </Button>
+            ) : (
+              <div className="w-[90px]"></div>
+            )}
+          </div>
 
+          {/* Centered Buttons */}
           <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={navigateBack}>
+              Back
+            </Button>
+            
             <Button
               variant="ghost"
               size="icon"
@@ -544,10 +588,22 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
               onClick={toggleStarredStatus}
               aria-pressed={entry?.starred}
               title={entry?.starred ? 'Remove from likes' : 'Add to likes'}
-              className={entry?.starred ? 'text-red-500' : ''}
+              className={entry?.starred ? 'text-rose-500' : ''}
             >
               <Heart className={`h-4 w-4 ${entry?.starred ? 'fill-current' : ''}`} />
             </Button>
+          </div>
+          
+          {/* Next Button */}
+          <div>
+            {adjacentEntries.next ? (
+              <Button variant="ghost" size="sm" onClick={navigateToNext} title="Newer entry">
+                Newer
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            ) : (
+              <div className="w-[90px]"></div>
+            )}
           </div>
         </div>
       </div>

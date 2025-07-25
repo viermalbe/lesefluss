@@ -81,7 +81,9 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
     if ((e.target as HTMLElement).closest('button')) {
       return
     }
-    router.push(`/issues/${entry.id}`)
+    // Wähle den richtigen Pfad basierend auf dem Archivstatus
+    const basePath = entry.archived ? '/archive/' : '/issues/'
+    router.push(`${basePath}${entry.id}`)
   }
 
   const handleToggleRead = (e: React.MouseEvent) => {
