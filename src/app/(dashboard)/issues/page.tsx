@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { EnhancedEntryCard } from '@/components/issues/enhanced-entry-card'
-import { BookOpen, Search, Filter, RefreshCw, Inbox, MailWarning, MailOpen, Heart, Archive } from 'lucide-react'
+import { BookOpen, Search, Filter, RefreshCw, Inbox, Mail, MailOpen, Heart, Archive } from 'lucide-react'
 import { useScrollPosition } from '@/lib/utils/scroll-position'
 import { InfiniteScroll } from '@/components/ui/infinite-scroll'
 import Link from 'next/link'
@@ -470,7 +470,7 @@ function IssuesPageContent() {
                   {(() => {
                     switch (statusFilter) {
                       case 'all': return <Inbox className="h-4 w-4" />
-                      case 'unread': return <MailWarning className="h-4 w-4" />
+                      case 'unread': return <Mail className="h-4 w-4" />
                       case 'favorites': return <Heart className="h-4 w-4" />
                       case 'read': return <MailOpen className="h-4 w-4" />
                       case 'archive': return <Archive className="h-4 w-4" />
@@ -502,7 +502,7 @@ function IssuesPageContent() {
               </SelectItem>
               <SelectItem value="unread">
                 <div className="flex items-center">
-                  <MailWarning className="h-4 w-4 mr-2" />
+                  <Mail className="h-4 w-4 mr-2" />
                   <span>New</span>
                 </div>
               </SelectItem>

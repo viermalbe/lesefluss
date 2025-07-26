@@ -403,10 +403,28 @@ export default function SourcesPage() {
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <h1 className="text-3xl font-bold text-foreground mb-2 pr-10">Sources</h1>
-        <p className="text-muted-foreground mb-6">
+        <h1 className="text-3xl font-bold text-foreground mb-6 pr-10">Sources</h1>
+        {/* <p className="text-muted-foreground mb-6">
           {subscriptions.length > 0 ? `${subscriptions.length} source${subscriptions.length === 1 ? '' : 's'} available` : 'No sources yet'}
-        </p>
+        </p> */}
+
+<div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={syncFeeds}
+            disabled={isSyncing || subscriptionsLoading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Syncing...' : 'Sync Feeds'}
+          </Button>
+          <AddSourceDialog onSuccess={loadSubscriptions}>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Source
+            </Button>
+          </AddSourceDialog>
+        </div>
+      </div>
         
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1">
@@ -434,23 +452,7 @@ export default function SourcesPage() {
           </Select>
         </div>
         
-        <div className="flex justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={syncFeeds}
-            disabled={isSyncing || subscriptionsLoading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Syncing...' : 'Sync Feeds'}
-          </Button>
-          <AddSourceDialog onSuccess={loadSubscriptions}>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Source
-            </Button>
-          </AddSourceDialog>
-        </div>
-      </div>
+
       
       {/* Sources List */}
       {subscriptionsLoading ? (

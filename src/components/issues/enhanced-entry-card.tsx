@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Clock, Calendar, Heart, Archive, MailWarning, MailOpen } from 'lucide-react'
+import { Clock, Calendar, Heart, Archive, Mail, MailOpen } from 'lucide-react'
 import { getRelativeTime, getEstimatedReadingTime } from '@/lib/utils/content-utils'
 import { OptimizedImage } from '@/components/ui/optimized-image'
 import { supabase } from '@/lib/supabase/client'
@@ -309,7 +309,7 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
             title={isUnread ? 'Mark as read' : 'Mark as unread'}
           >
             {isUnread ? (
-              <MailWarning className="w-4 h-4" />
+              <Mail className="w-4 h-4" />
             ) : (
               <MailOpen className="w-4 h-4" />
             )}

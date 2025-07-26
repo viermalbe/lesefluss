@@ -101,6 +101,9 @@ export class NewsletterParser {
         this.fixTableLayouts($)
       }
       
+      // Stelle sicher, dass alle Links in einem neuen Tab geöffnet werden
+      this.optimizeAllLinks($)
+      
       // Add responsive wrapper
       return this.wrapInResponsiveContainer($.html())
       
@@ -111,6 +114,24 @@ export class NewsletterParser {
     }
   }
   
+  /**
+   * Optimize all links in the newsletter content
+   * - Set target="_blank" for all links to open in new tab
+   * - Apply consistent styling for proper word wrapping
+   */
+  private optimizeAllLinks($: cheerio.CheerioAPI): void {
+    $('a').each((_, link) => {
+      // Setze target="_blank" für alle Links
+      $(link).attr('target', '_blank')
+      $(link).attr('rel', 'noopener noreferrer')
+      
+      // Wende konsistente Styling-Regeln an
+      let linkStyle = $(link).attr('style') || ''
+      linkStyle += 'display: inline !important; white-space: normal !important; word-break: normal !important; overflow-wrap: break-word !important; hyphens: none !important;'
+      $(link).attr('style', linkStyle)
+    })
+  }
+
   /**
    * Remove tracking pixels and hidden elements
    */
@@ -267,7 +288,8 @@ export class NewsletterParser {
       // Optimiere Links innerhalb von Tabellenzellen
       $(cell).find('a').each((_, link) => {
         let linkStyle = $(link).attr('style') || ''
-        linkStyle += 'word-break: keep-all !important; overflow-wrap: anywhere !important; hyphens: none !important; white-space: normal !important; display: inline !important; break-inside: avoid !important;'
+        // CSS für korrektes Umbrechen von Links: an Wortgrenzen ja, mitten im Wort nein
+        linkStyle += 'display: inline !important; white-space: normal !important; word-break: normal !important; overflow-wrap: break-word !important; hyphens: none !important;'
         $(link).attr('style', linkStyle)
       })
       $(cell).attr('style', style)
