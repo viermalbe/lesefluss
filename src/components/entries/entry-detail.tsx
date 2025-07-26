@@ -601,12 +601,12 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
       {/* Sticky header/footer */}
       <div className="fixed inset-x-0 bottom-0 z-50 bg-background">
         <div className="container max-w-4xl mx-auto px-4 py-2 flex items-center justify-between">
-          {/* Previous Button */}
+          {/* Next Button (now on the left) */}
           <div>
-            {adjacentEntries.previous ? (
-              <Button variant="ghost" size="sm" onClick={navigateToPrevious} title="Older entry">
+            {adjacentEntries.next ? (
+              <Button variant="ghost" size="sm" onClick={navigateToNext} title="Newer entry">
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Older
+                Newer
               </Button>
             ) : (
               <div className="w-[90px]"></div>
@@ -638,11 +638,11 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
             </Button>
           </div>
           
-          {/* Next Button */}
+          {/* Previous Button (now on the right) */}
           <div>
-            {adjacentEntries.next ? (
-              <Button variant="ghost" size="sm" onClick={navigateToNext} title="Newer entry">
-                Newer
+            {adjacentEntries.previous ? (
+              <Button variant="ghost" size="sm" onClick={navigateToPrevious} title="Older entry">
+                Older
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             ) : (

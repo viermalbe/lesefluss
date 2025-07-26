@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { EnhancedEntryCard } from '@/components/issues/enhanced-entry-card'
 import { BookOpen, Search, Filter, RefreshCw, Inbox, MailWarning, MailOpen, Heart, Archive } from 'lucide-react'
 import { useScrollPosition } from '@/lib/utils/scroll-position'
+import { InfiniteScroll } from '@/components/ui/infinite-scroll'
 import Link from 'next/link'
 
 // Verhindert das automatische Neuladen beim Fokuswechsel
@@ -33,6 +34,9 @@ function disableFocusRefresh() {
   }
 }
 
+// Konstanten für die Pagination
+const ITEMS_PER_PAGE = 15
+
 function IssuesPageContent() {
   const { user, loading } = useAuth()
   const { isLoading: syncLoading, canSync, triggerSync, autoSyncIfNeeded, getTimeUntilNextSync } = useSmartSync()
@@ -44,6 +48,11 @@ function IssuesPageContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [isStateLoaded, setIsStateLoaded] = useState(false)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMoreEntries, setHasMoreEntries] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   
   // Verhindere automatisches Neuladen beim Fokuswechsel
   useEffect(() => {
@@ -103,9 +112,9 @@ function IssuesPageContent() {
     return cleanup
   }, [setupAutoSave])
   
-  // Restore scroll position after entries are loaded
+  // Restore scroll position only after initial entries are loaded
   useEffect(() => {
-    if (!entriesLoading && entries.length > 0 && typeof window !== 'undefined') {
+    if (!entriesLoading && entries.length > 0 && currentPage === 1 && typeof window !== 'undefined') {
       // Multiple restoration attempts with different delays for reliability
       const scrollAttempts = [100, 300, 600, 1000]
       
@@ -115,14 +124,27 @@ function IssuesPageContent() {
         }, delay)
       })
     }
-  }, [entriesLoading, entries.length, restorePosition])
+  }, [entriesLoading, entries.length, currentPage, restorePosition])
 
-  // Fetch entries function
-  const fetchEntries = async () => {
+  // Fetch entries function with pagination
+  const fetchEntries = async (page = 1, reset = true) => {
     if (!user) return
     
-    setEntriesLoading(true)
+    if (reset) {
+      setEntriesLoading(true)
+      setCurrentPage(1)
+    } else {
+      setIsLoadingMore(true)
+    }
+    
     try {
+      // Calculate pagination parameters
+      const limit = ITEMS_PER_PAGE
+      const from = (page - 1) * limit
+      const to = from + limit - 1
+      
+      console.log(`Fetching entries page ${page}: range ${from}-${to}`)
+      
       let query = supabase
         .from('entries')
         .select(`
@@ -134,7 +156,7 @@ function IssuesPageContent() {
             status,
             image_url
           )
-        `)
+        `, { count: 'exact' }) // Request exact count for pagination
         .eq('subscription.user_id', user.id)
         
       // WICHTIG: Archiv-Filter korrekt anwenden
@@ -145,18 +167,43 @@ function IssuesPageContent() {
       // Sortiere nach Veröffentlichungsdatum (neueste zuerst)
       query = query.order('published_at', { ascending: false })
       
-      const { data, error } = await query
+      // Apply pagination
+      query = query.range(from, to)
+      
+      const { data, error, count } = await query
       
       if (error) {
         console.error('Error fetching entries:', error)
         return
       }
       
-      setEntries(data || [])
+      // Update state based on whether this is a reset or load more
+      if (reset) {
+        setEntries(data || [])
+      } else {
+        setEntries(prev => [...prev, ...(data || [])])
+      }
+      
+      // Check if there are more entries to load
+      const totalFetched = (page * limit)
+      const hasMore = count ? totalFetched < count : false
+      setHasMoreEntries(hasMore)
+      
+      // Update current page if this was a successful load more
+      if (!reset && data && data.length > 0) {
+        setCurrentPage(page)
+      }
+      
+      return hasMore
     } catch (error) {
       console.error('Error fetching entries:', error)
+      return false
     } finally {
-      setEntriesLoading(false)
+      if (reset) {
+        setEntriesLoading(false)
+      } else {
+        setIsLoadingMore(false)
+      }
     }
   }
 
@@ -309,7 +356,7 @@ function IssuesPageContent() {
         router.push('/login')
       } else {
         setHasCheckedAuth(true)
-        fetchEntries()
+        fetchEntries(1, true)
       }
     }
   }, [user, loading, router])
@@ -317,7 +364,7 @@ function IssuesPageContent() {
   // Refetch entries when filters change
   useEffect(() => {
     if (user && hasCheckedAuth) {
-      fetchEntries()
+      fetchEntries(1, true) // Reset and fetch first page
     }
   }, [searchQuery, statusFilter, user, hasCheckedAuth])
 
@@ -360,6 +407,15 @@ function IssuesPageContent() {
     
     return true
   })
+  
+  // Handler for loading more entries
+  const handleLoadMore = async (): Promise<boolean> => {
+    if (isLoadingMore || !hasMoreEntries) return false
+    const nextPage = currentPage + 1
+    const result = await fetchEntries(nextPage, false)
+    // Ensure we always return a boolean value
+    return result === true
+  }
 
   // Funktion, die den Seitentitel basierend auf dem Filter zurückgibt
   const getPageTitle = () => {
@@ -381,18 +437,18 @@ function IssuesPageContent() {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <div className="mb-8">
+      {/*<div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground">
           {getPageTitle()}
         </h1>
         <p className="text-muted-foreground mt-1">
           {filteredEntries.length > 0 ? (
             searchQuery.trim() || statusFilter !== 'all' 
-              ? `${filteredEntries.length} of ${entries.length} issues shown`
-              : `${entries.length} issue${entries.length === 1 ? '' : 's'} available`
-          ) : 'No issues '}
+              ? `${filteredEntries.length} of ${entries.length} articles shown`
+              : `${entries.length} article${entries.length === 1 ? '' : 's'} available`
+          ) : 'No articles '}
         </p>
-      </div>
+      </div>*/}
 
       {/* Search and Filter Bar */}
       <div className="mb-6">
@@ -400,7 +456,7 @@ function IssuesPageContent() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Search issues..."
+              placeholder="Search articles..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 w-full border-border focus-visible:ring-ring"
@@ -476,7 +532,12 @@ function IssuesPageContent() {
       {/* Issues List */}
       {entriesLoading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="text-lg">Loading issues...</div>
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin">
+              <RefreshCw className="h-8 w-8 text-primary" />
+            </div>
+            <div className="text-lg">Loading issues...</div>
+          </div>
         </div>
       ) : filteredEntries.length === 0 ? (
         <div className="text-center py-16">
@@ -494,33 +555,73 @@ function IssuesPageContent() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredEntries.map((entry) => (
-            <EnhancedEntryCard
-              key={entry.id}
-              entry={entry}
-              onToggleReadStatus={toggleReadStatus}
-              onToggleStarred={toggleStarredStatus}
-              onToggleArchived={toggleArchived}
-            />
-          ))}
-        </div>
+        <InfiniteScroll
+          onLoadMore={handleLoadMore}
+          isLoading={isLoadingMore}
+          hasMore={hasMoreEntries}
+          loadingComponent={
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin">
+                <RefreshCw className="h-6 w-6 text-primary" />
+              </div>
+              <span className="ml-2">Loading more...</span>
+            </div>
+          }
+          endComponent={
+            <div className="text-center py-4 text-muted-foreground">
+              You've reached the end
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredEntries.map((entry) => (
+              <EnhancedEntryCard
+                key={entry.id}
+                entry={entry}
+                onToggleReadStatus={toggleReadStatus}
+                onToggleStarred={toggleStarredStatus}
+                onToggleArchived={toggleArchived}
+              />
+            ))}
+          </div>
+        </InfiniteScroll>
       )}
     </div>
   )
 }
 
-// Lazy loading Komponente für bessere Performance
+// Verbesserte Lazy-Loading-Komponente für bessere Performance und Hydration
 const LazyIssuesContent = () => {
   // Verwende useEffect, um clientseitige Hydration zu verbessern
   const [isClient, setIsClient] = useState(false)
   
   useEffect(() => {
-    setIsClient(true)
+    // Setze isClient mit einer kurzen Verzögerung, um Hydration-Probleme zu vermeiden
+    const timer = setTimeout(() => {
+      setIsClient(true)
+    }, 10)
+    
+    return () => clearTimeout(timer)
   }, [])
   
+  // Zeige einen Platzhalter während der Hydration, um Layout-Shifts zu vermeiden
   if (!isClient) {
-    return null
+    return (
+      <div className="container mx-auto px-4 py-6">
+        <div className="mb-8">
+          <div className="h-8 w-32 bg-gray-200 animate-pulse rounded mb-2"></div>
+          <div className="h-4 w-48 bg-gray-200 animate-pulse rounded"></div>
+        </div>
+        <div className="mb-6">
+          <div className="h-10 bg-gray-200 animate-pulse rounded mb-4"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-64 bg-gray-200 animate-pulse rounded"></div>
+          ))}
+        </div>
+      </div>
+    )
   }
   
   return <IssuesPageContent />
