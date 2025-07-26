@@ -247,6 +247,30 @@
 }
 
 /* ========================================
+   CONVERTED TABLES
+   ======================================== */
+
+.newsletter-converted-table {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+  hyphens: none !important;
+}
+
+.newsletter-converted-table a {
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  hyphens: none !important;
+  white-space: normal !important;
+  display: inline !important;
+  break-inside: avoid !important;
+}
+
+/* ========================================
    DARK MODE SUPPORT
    ======================================== */
 

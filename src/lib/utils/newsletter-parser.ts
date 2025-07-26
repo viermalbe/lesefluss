@@ -261,8 +261,15 @@ export class NewsletterParser {
       let style = $(cell).attr('style') || ''
       style = style.replace(/width\s*:\s*[^;]+;?/gi, '')
       
-      // Add word-break for better text wrapping with !important
-      style += 'word-break: break-word !important; overflow-wrap: break-word !important; max-width: 100% !important;'
+      // Verbesserte Textumbruch-Eigenschaften für Tabellenzellen
+      style += 'word-break: normal !important; overflow-wrap: anywhere !important; max-width: 100% !important;'
+      
+      // Optimiere Links innerhalb von Tabellenzellen
+      $(cell).find('a').each((_, link) => {
+        let linkStyle = $(link).attr('style') || ''
+        linkStyle += 'word-break: keep-all !important; overflow-wrap: anywhere !important; hyphens: none !important; white-space: normal !important; display: inline !important; break-inside: avoid !important;'
+        $(link).attr('style', linkStyle)
+      })
       $(cell).attr('style', style)
       
       // Add class for additional CSS targeting
@@ -380,8 +387,8 @@ export class NewsletterParser {
         // Get the cell content
         const cellContent = $(cells[0]).html() || ''
         
-        // Create a new div with the cell content
-        const div = `<div class="newsletter-converted-table">${cellContent}</div>`
+        // Create a new div with the cell content and optimierten Wortumbruch-Eigenschaften
+        const div = `<div class="newsletter-converted-table" style="word-break: normal !important; overflow-wrap: anywhere !important; hyphens: none !important;">${cellContent}</div>`
         
         // Replace the table with the div
         $(table).replaceWith(div)
@@ -402,7 +409,6 @@ export class NewsletterParser {
         max-width: ${this.options.maxWidth};
         margin: 0 auto;
         overflow-x: hidden;
-        word-break: break-word;
       ">
         ${html}
       </div>

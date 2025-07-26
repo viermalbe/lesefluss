@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, ChevronLeft, ChevronRight, Heart, Inbox, ListFilter, X } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, Heart, Inbox, ListFilter, X } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { getRelativeTime } from '@/lib/utils/content-utils'
 import { supabase } from '@/lib/supabase/client'
@@ -42,7 +42,8 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     next: string | null;
     source: 'issues' | 'archive';
   }>({ previous: null, next: null, source: 'issues' })
-  const [navigationVisible, setNavigationVisible] = useState(false)
+  const [navigationVisible, setNavigationVisible] = useState(true)
+  const [showBackToTop, setShowBackToTop] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   
   // Einfache Scroll-Position-Wiederherstellung mit sessionStorage
@@ -381,7 +382,14 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     }
     
     setEntry((prev: any) => ({ ...prev, starred: newStarred }))
-    toast.success(newStarred ? 'Zu Favoriten hinzugefügt' : 'Aus Favoriten entfernt')
+  }
+
+  // Scroll to top function
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    })
   }
 
   // Toggle archived status
@@ -421,6 +429,29 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     // Reset navigation visibility when entry changes
     setNavigationVisible(false)
   }, [user, entryId])
+  
+  // Scroll-Handler für Back-to-Top Button
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      
+      // Zeige den Back-to-Top Button ab 500px Scroll-Position
+      if (currentScrollY > 500) {
+        setShowBackToTop(true)
+      } else {
+        setShowBackToTop(false)
+      }
+      
+      // Aktualisiere die letzte Scroll-Position
+      setLastScrollY(currentScrollY)
+    }
+    
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
 
   // Sanitize HTML content on client-side
   useEffect(() => {
@@ -524,6 +555,20 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
 
   return (
     <div className="min-h-screen pb-16" ref={containerRef}>
+      {/* Back to Top Button */}
+      {showBackToTop && (
+        <div className="fixed bottom-20 right-4 z-50 transition-opacity duration-300 opacity-80 hover:opacity-100">
+          <Button 
+            onClick={scrollToTop}
+            size="icon"
+            className="h-10 w-10 rounded-full shadow-md bg-primary/90 hover:bg-primary text-primary-foreground transition-all duration-200"
+            aria-label="Back to top"
+            title="Back to top"
+          >
+            <ChevronUp className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
       {/* Navigation indicators */}
       {/* Navigation indicators - mit Klick-Funktionalität */}
       <div className={`fixed inset-y-0 left-0 z-40 flex items-center transition-opacity duration-300 ${navigationVisible ? 'opacity-50' : 'opacity-0'}`}>
@@ -567,10 +612,6 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
 
           {/* Centered Buttons */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={navigateBack}>
-              Back
-            </Button>
-            
             <Button
               variant="ghost"
               size="icon"
@@ -611,8 +652,21 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
       {/* Main content */}
       <div className="container mx-auto px-0 sm:px-4 md:px-6 py-4 sm:max-w-4xl">
         <Card className="shadow-sm rounded-none sm:rounded-lg">
-          <CardHeader className="space-y-2 px-4 sm:px-6">
-            <CardTitle className="text-xl sm:text-2xl">
+          <CardHeader className="space-y-2 px-4 sm:px-6 relative">
+            {/* Close Button - positioned relative to card width */}
+            <div className="absolute top-0 right-4 sm:right-6 z-10 rounded-full border">
+              <Button 
+                onClick={navigateBack}
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 rounded-full hover:bg-primary/10 transition-all duration-200"
+                aria-label="Close"
+                title="Close"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <CardTitle className="text-xl sm:text-2xl pr-8">
               {entry.title}
             </CardTitle>
             <CardDescription className="flex items-center gap-2 text-base">

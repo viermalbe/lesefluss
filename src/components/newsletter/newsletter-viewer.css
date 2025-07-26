@@ -78,14 +78,24 @@
   height: auto;
 }
 
-/* Links mit korrektem Wortumbruch */
+/* Globale Regeln für alle Links in Newslettern */
 .newsletter-wrapper a,
-.newsletter-content a {
-  word-break: normal !important;
-  overflow-wrap: break-word !important;
-  hyphens: auto !important;
+.newsletter-content a,
+.newsletter-table-cell a,
+.newsletter-converted-table a,
+td a,
+th a {
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  hyphens: none !important;
   white-space: normal !important;
   word-wrap: break-word !important;
+  display: inline !important;
+  /* Verhindert Umbrüche innerhalb von Wörtern */
+  break-inside: avoid !important;
+  /* Erlaubt Umbrüche zwischen Wörtern */
+  break-after: auto !important;
+  break-before: auto !important;
 }
 
 /* Responsive Bilder mit Aspect-Ratio-Erhaltung */
