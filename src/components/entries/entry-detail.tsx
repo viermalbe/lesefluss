@@ -3,14 +3,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, Heart, Inbox, ListFilter, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronUp, Heart, Archive, ListFilter, X } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { getRelativeTime } from '@/lib/utils/content-utils'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/hooks'
 import { NewsletterViewer } from '@/components/newsletter/newsletter-viewer'
-import { useNavigationGestures } from '@/lib/hooks/use-navigation-gestures'
+
 import {
   Card,
   CardContent,
@@ -36,25 +36,19 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
   const [entry, setEntry] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [lastScrollY, setLastScrollY] = useState(0)
   const [adjacentEntries, setAdjacentEntries] = useState<{
     previous: string | null;
     next: string | null;
     source: 'issues' | 'archive';
   }>({ previous: null, next: null, source: 'issues' })
-  const [navigationVisible, setNavigationVisible] = useState(true)
   const [showBackToTop, setShowBackToTop] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+
   
   // Einfache Scroll-Position-Wiederherstellung mit sessionStorage
   const scrollPositionKey = `scroll-position-${entryId}`
   
   // Determine source (issues or archive) from pathname and extract search params
-  const determineSource = (): 'issues' | 'archive' => {
-    // Verbesserte Pfaderkennung für Archive
-    if (pathname?.includes('/archive/') || pathname?.includes('/archive?')) {
-      return 'archive'
-    }
+  const determineSource = (): string => {
     return 'issues'
   }
   
@@ -91,15 +85,18 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
         .eq('id', currentEntryId)
         .single()
       
-      // Bestimme die Quelle basierend auf dem Archivstatus des aktuellen Eintrags
-      const isArchived = currentEntry?.archived || false
-      const source = isArchived ? 'archive' : 'issues'
-      const filter = { archived: isArchived }
+      // Bestimme die Quelle und Filter basierend auf den URL-Parametern
+      const source = 'issues' // Immer issues, da Archive jetzt ein Filter ist
       const { searchQuery, statusFilter } = extractSearchParams()
+      
+      // Wenn der aktuelle Eintrag archiviert ist, aber der Filter nicht auf "archive" steht,
+      // verwenden wir trotzdem den Archiv-Filter, um korrekte Navigation zu ermöglichen
+      const isArchived = currentEntry?.archived || false
+      const useArchiveFilter = isArchived || statusFilter === 'archive'
       
       console.log('Debug navigation:', { 
         source, 
-        filter, 
+        useArchiveFilter, 
         pathname, 
         currentEntryId,
         isArchived,
@@ -118,10 +115,11 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
           created_at,
           status,
           starred,
+          archived,
           subscription:subscriptions!inner(user_id, title)
         `)
         .eq('subscription.user_id', user.id)
-        .eq('archived', filter.archived)
+        .eq('archived', useArchiveFilter)
         .order('published_at', { ascending: false })
       
       if (error) {
@@ -133,11 +131,14 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
         return
       }
       
-      // Wende die gleichen Filter an wie auf der Issues/Archive-Seite
+      // Wende die gleichen Filter an wie auf der Issues-Seite
       const filteredEntries = allEntries.filter(entry => {
         // Status filter
         if (statusFilter === 'favorites') {
           if (!entry.starred) return false
+        } else if (statusFilter === 'archive') {
+          // Archiv-Filter wird bereits serverseitig angewendet
+          // Hier könnten weitere Filterregeln für archivierte Einträge hinzugefügt werden
         } else if (statusFilter !== 'all' && entry.status !== statusFilter) {
           return false
         }
@@ -181,9 +182,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
         source
       })
       
-      // Show navigation indicators briefly
-      setNavigationVisible(true)
-      setTimeout(() => setNavigationVisible(false), 2000)
+      // Adjacente Einträge wurden geladen
     } catch (err) {
       console.error('Error fetching adjacent entries:', err)
     }
@@ -193,7 +192,8 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
   const navigateToEntry = (entryId: string | null) => {
     if (!entryId) return
     
-    const source = determineSource()
+    // Immer zu /issues navigieren, da Archive jetzt ein Filter ist
+    const source = 'issues'
     const { searchQuery, statusFilter } = extractSearchParams()
     
     // Baue die URL mit den aktuellen Suchparametern
@@ -245,25 +245,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     router.push(url)
   }
   
-  // Debug-Ausgabe für die Navigation
-  useEffect(() => {
-    if (adjacentEntries.next || adjacentEntries.previous) {
-      console.log('Navigation verfügbar:', {
-        next: adjacentEntries.next,
-        previous: adjacentEntries.previous,
-        source: adjacentEntries.source
-      })
-    }
-  }, [adjacentEntries])
-  
-  // Setup swipe and keyboard navigation
-  useNavigationGestures({
-    onNext: navigateToNext,
-    onPrevious: navigateToPrevious,
-    onBack: navigateBack,
-    containerRef,
-    enabled: !isLoading && !!entry
-  })
+
   
   // Fetch entry by ID and automatically mark as read
   const fetchEntry = async () => {
@@ -349,9 +331,17 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     
     const newStatus = entry.status === 'read' ? 'unread' : 'read'
     
+    // Wenn ein archivierter Eintrag auf "unread" gesetzt wird, Archiv-Status entfernen
+    const updateData: { status: 'read' | 'unread'; archived?: boolean } = { status: newStatus }
+    
+    // Wenn wir einen Eintrag auf "unread" setzen und er ist archiviert, entferne den Archiv-Status
+    if (newStatus === 'unread' && entry.archived) {
+      updateData.archived = false
+    }
+    
     const { error } = await supabase
       .from('entries')
-      .update({ status: newStatus })
+      .update(updateData)
       .eq('id', entryId)
     
     if (error) {
@@ -360,7 +350,13 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
       return
     }
     
-    setEntry((prev: any) => ({ ...prev, status: newStatus }))
+    // Update local state
+    setEntry((prev: any) => ({
+      ...prev,
+      status: newStatus,
+      ...(newStatus === 'unread' && prev.archived ? { archived: false } : {})
+    }))
+    
     toast.success(newStatus === 'read' ? 'Als geöffnet markiert' : 'Als neu markiert')
   }
 
@@ -370,9 +366,17 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     
     const newStarred = !entry.starred
     
+    // Wenn ein archivierter Eintrag favorisiert wird, Archiv-Status entfernen
+    const updateData: { starred: boolean; archived?: boolean } = { starred: newStarred }
+    
+    // Wenn wir einen Eintrag favorisieren und er ist archiviert, entferne den Archiv-Status
+    if (newStarred && entry.archived) {
+      updateData.archived = false
+    }
+    
     const { error } = await supabase
       .from('entries')
-      .update({ starred: newStarred })
+      .update(updateData)
       .eq('id', entryId)
     
     if (error) {
@@ -381,7 +385,12 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
       return
     }
     
-    setEntry((prev: any) => ({ ...prev, starred: newStarred }))
+    // Update local state
+    setEntry((prev: any) => ({
+      ...prev,
+      starred: newStarred,
+      ...(newStarred && prev.archived ? { archived: false } : {})
+    }))
   }
 
   // Scroll to top function
@@ -398,9 +407,17 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     
     const newArchived = !entry.archived
     
+    // Beim Archivieren: Status auf "read" setzen und Like entfernen
+    const updateData: { archived: boolean; status?: 'read' | 'unread'; starred?: boolean } = { archived: newArchived }
+    
+    if (newArchived) {
+      updateData.status = 'read'
+      updateData.starred = false
+    }
+    
     const { error } = await supabase
       .from('entries')
-      .update({ archived: newArchived })
+      .update(updateData)
       .eq('id', entryId)
     
     if (error) {
@@ -409,13 +426,26 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
       return
     }
     
-    setEntry((prev: any) => ({ ...prev, archived: newArchived }))
+    // Update local state with all changed fields
+    setEntry((prev: any) => ({
+      ...prev,
+      archived: newArchived,
+      ...(newArchived ? { status: 'read', starred: false } : {})
+    }))
+    
     toast.success(newArchived ? 'Archiviert' : 'Aus Archiv entfernt')
     
-    // Navigate back to previous page after archiving (not unarchiving)
+    // Nach dem Archivieren zum nächsten (älteren) Eintrag navigieren
+    // Falls kein älterer Eintrag existiert, zur Übersicht zurückkehren
     if (newArchived) {
       setTimeout(() => {
-        router.back()
+        if (adjacentEntries.previous) {
+          // Zum nächsten (älteren) Eintrag navigieren
+          navigateToEntry(adjacentEntries.previous)
+        } else {
+          // Zur Übersicht zurückkehren, wenn kein älterer Eintrag existiert
+          router.back()
+        }
       }, 500) // Small delay to show the success toast
     }
   }
@@ -426,8 +456,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
       fetchEntry()
     }
     
-    // Reset navigation visibility when entry changes
-    setNavigationVisible(false)
+    // Fetch entry when it changes
   }, [user, entryId])
   
   // Scroll-Handler für Back-to-Top Button
@@ -442,8 +471,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
         setShowBackToTop(false)
       }
       
-      // Aktualisiere die letzte Scroll-Position
-      setLastScrollY(currentScrollY)
+      // Scroll-Position aktualisiert
     }
     
     window.addEventListener('scroll', handleScroll, { passive: true })
@@ -498,8 +526,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
           const currentScrollY = window.scrollY;
           sessionStorage.setItem(scrollPositionKey, currentScrollY.toString());
           
-          // Scroll-Position für Animation der Navigationsleiste aktualisieren
-          setLastScrollY(currentScrollY);
+          // Scroll-Position aktualisiert
         } catch (err) {
           console.error('Error in scroll handler:', err)
         }
@@ -554,7 +581,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
   // Dieser useEffect wurde entfernt, da er doppelt war
 
   return (
-    <div className="min-h-screen pb-16" ref={containerRef}>
+    <div className="min-h-screen pb-16">
       {/* Back to Top Button */}
       {showBackToTop && (
         <div className="fixed bottom-20 right-4 z-50 transition-opacity duration-300 opacity-80 hover:opacity-100">
@@ -569,31 +596,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
           </Button>
         </div>
       )}
-      {/* Navigation indicators */}
-      {/* Navigation indicators - mit Klick-Funktionalität */}
-      <div className={`fixed inset-y-0 left-0 z-40 flex items-center transition-opacity duration-300 ${navigationVisible ? 'opacity-50' : 'opacity-0'}`}>
-        {adjacentEntries.previous && (
-          <button 
-            onClick={navigateToPrevious}
-            className="bg-background/80 p-2 rounded-r-full ml-1 hover:bg-background/90 focus:outline-none focus:ring-2 focus:ring-primary"
-            aria-label="Older entry"
-          >
-            <ChevronLeft className="h-8 w-8" />
-          </button>
-        )}
-      </div>
-      
-      <div className={`fixed inset-y-0 right-0 z-40 flex items-center transition-opacity duration-300 ${navigationVisible ? 'opacity-50' : 'opacity-0'}`}>
-        {adjacentEntries.next && (
-          <button 
-            onClick={navigateToNext}
-            className="bg-background/80 p-2 rounded-l-full mr-1 hover:bg-background/90 focus:outline-none focus:ring-2 focus:ring-primary"
-            aria-label="Newer entry"
-          >
-            <ChevronRight className="h-8 w-8" />
-          </button>
-        )}
-      </div>
+
       
       {/* Sticky header/footer */}
       <div className="fixed inset-x-0 bottom-0 z-50 bg-background">
@@ -620,7 +623,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
               title={entry?.archived ? 'Remove from archive' : 'Archive'}
               className={entry?.archived ? 'text-primary' : ''}
             >
-              <Inbox className="h-4 w-4" />
+              <Archive className="h-4 w-4" />
             </Button>
 
             <Button

@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { EnhancedEntryCard } from '@/components/issues/enhanced-entry-card'
-import { BookOpen, Search, Filter, RefreshCw } from 'lucide-react'
+import { BookOpen, Search, Filter, RefreshCw, Inbox, MailWarning, MailOpen, Heart, Archive } from 'lucide-react'
 import { useScrollPosition } from '@/lib/utils/scroll-position'
 import Link from 'next/link'
 
@@ -136,11 +136,14 @@ function IssuesPageContent() {
           )
         `)
         .eq('subscription.user_id', user.id)
-        .eq('archived', false)
-        .order('published_at', { ascending: false })
+        
+      // WICHTIG: Archiv-Filter korrekt anwenden
+      // Wenn wir im Archiv-Filter sind, zeige nur archivierte Einträge
+      // Ansonsten zeige nur nicht-archivierte Einträge
+      query = query.eq('archived', statusFilter === 'archive')
       
-      // Status filter will be applied client-side for simplicity
-      // This ensures we get all entries and can search across all fields
+      // Sortiere nach Veröffentlichungsdatum (neueste zuerst)
+      query = query.order('published_at', { ascending: false })
       
       const { data, error } = await query
       
@@ -158,43 +161,145 @@ function IssuesPageContent() {
   }
 
   // Mark entry as read/unread
-  const toggleReadStatus = async (entryId: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'read' ? 'unread' : 'read'
+  const toggleReadStatus = async (entryId: string, newStatus: string) => {
+    // Finde den Eintrag, um seine aktuellen Werte zu kennen
+    const entryToUpdate = entries.find(entry => entry.id === entryId)
+    if (!entryToUpdate) return
+    
+    const currentStatus = entryToUpdate.status
+    const isArchived = entryToUpdate.archived
+    
+    // Prüfe, ob der Archivstatus geändert werden muss
+    // Wenn ein Eintrag auf ungelesen gesetzt wird und archiviert ist, entferne den Archiv-Status
+    const shouldUpdateArchive = newStatus === 'unread' && isArchived
+    
+    // Update local state first for immediate UI feedback
+    setEntries(prevEntries => prevEntries.map(entry => {
+      if (entry.id === entryId) {
+        const updatedEntry = { 
+          ...entry, 
+          status: newStatus as 'read' | 'unread'
+        }
+        
+        // Wenn auf ungelesen gesetzt und archiviert, entferne Archiv-Status
+        if (shouldUpdateArchive) {
+          updatedEntry.archived = false
+        }
+        
+        return updatedEntry
+      }
+      return entry
+    }))
+    
+    // Then send the API request
+    const updateData: { status: 'read' | 'unread'; archived?: boolean } = { status: newStatus as 'read' | 'unread' }
+    if (shouldUpdateArchive) {
+      updateData.archived = false
+    }
     
     const { error } = await supabase
       .from('entries')
-      .update({ status: newStatus })
+      .update(updateData)
       .eq('id', entryId)
     
     if (error) {
       console.error('Error updating entry status:', error)
-      return
+      // Revert local state if API call fails
+      setEntries(prevEntries => prevEntries.map(entry => {
+        if (entry.id === entryId) {
+          const revertedEntry = { 
+            ...entry, 
+            status: currentStatus as 'read' | 'unread'
+          }
+          
+          if (shouldUpdateArchive) {
+            revertedEntry.archived = true
+          }
+          
+          return revertedEntry
+        }
+        return entry
+      }))
     }
-    
-    // Update local state
-    setEntries(entries.map(entry => 
-      entry.id === entryId 
-        ? { ...entry, status: newStatus as 'read' | 'unread' }
-        : entry
-    ))
   }
 
   // Toggle starred status
-  const toggleStarredStatus = (entryId: string, currentStarred: boolean) => {
-    // Update local state immediately for better UX
-    setEntries(entries.map(entry => 
-      entry.id === entryId 
-        ? { ...entry, starred: !currentStarred }
-        : entry
-    ))
+  const toggleStarredStatus = (entryId: string, newStarredValue: boolean) => {
+    // Finde den Eintrag, um seine aktuellen Werte zu kennen
+    const entryToUpdate = entries.find(entry => entry.id === entryId)
+    if (!entryToUpdate) return
+    
+    // WICHTIG: Wenn ein Eintrag geliked wird und wir im Archiv-Filter sind,
+    // muss er aus der Ansicht entfernt werden, da er nicht mehr archiviert ist
+    if (newStarredValue && statusFilter === 'archive') {
+      setEntries(prevEntries => prevEntries.filter(entry => entry.id !== entryId))
+      return // Wichtig: Beende die Funktion hier
+    }
+    
+    // WICHTIG: Wenn ein Eintrag nicht mehr geliked wird und wir im Favoriten-Filter sind,
+    // muss er aus der Ansicht entfernt werden
+    if (!newStarredValue && statusFilter === 'favorites') {
+      setEntries(prevEntries => prevEntries.filter(entry => entry.id !== entryId))
+      return // Wichtig: Beende die Funktion hier
+    }
+    
+    // In allen anderen Fällen aktualisiere den Eintrag in der Liste
+    setEntries(prevEntries => prevEntries.map(entry => {
+      if (entry.id === entryId) {
+        // Aktualisiere alle relevanten Felder
+        const updatedEntry = { ...entry, starred: newStarredValue }
+        
+        // Wenn ein Eintrag geliked wird und archiviert ist, entferne den Archiv-Status
+        if (newStarredValue && entry.archived) {
+          updatedEntry.archived = false
+        }
+        
+        return updatedEntry
+      }
+      return entry
+    }))
   }
 
   // Toggle archived status
-  const toggleArchived = (entryId: string, currentArchived: boolean) => {
-    // Remove from local state immediately when archived
-    if (!currentArchived) {
-      setEntries(entries.filter(entry => entry.id !== entryId))
+  const toggleArchived = (entryId: string, newArchived: boolean) => {
+    // Finde den Eintrag, um seine aktuellen Werte zu kennen
+    const entryToUpdate = entries.find(entry => entry.id === entryId)
+    if (!entryToUpdate) return
+    
+    // WICHTIG: Wenn ein Eintrag archiviert wird und wir NICHT im Archiv-Filter sind,
+    // muss er aus der Ansicht entfernt werden
+    if (newArchived && statusFilter !== 'archive') {
+      console.log('Removing archived entry from view, current filter:', statusFilter)
+      // Entferne den Eintrag aus der Liste
+      setEntries(prevEntries => prevEntries.filter(entry => entry.id !== entryId))
+      return // Wichtig: Beende die Funktion hier
     }
+    
+    // Wenn ein Eintrag entarchiviert wird und wir IM Archiv-Filter sind,
+    // muss er ebenfalls aus der Ansicht entfernt werden
+    if (!newArchived && statusFilter === 'archive') {
+      console.log('Removing unarchived entry from archive view')
+      // Entferne den Eintrag aus der Liste
+      setEntries(prevEntries => prevEntries.filter(entry => entry.id !== entryId))
+      return // Wichtig: Beende die Funktion hier
+    }
+    
+    // In allen anderen Fällen aktualisiere den Eintrag in der Liste
+    setEntries(prevEntries => prevEntries.map(entry => {
+      if (entry.id === entryId) {
+        // Aktualisiere alle relevanten Felder
+        const updatedEntry = { ...entry, archived: newArchived }
+        
+        // Wenn archiviert wird, setze auch andere Felder
+        if (newArchived) {
+          updatedEntry.status = 'read'
+          updatedEntry.starred = false
+        }
+        
+        return updatedEntry
+      }
+      return entry
+    }))
   }
 
   // Auth guard effect
@@ -236,6 +341,9 @@ function IssuesPageContent() {
     // Status filter
     if (statusFilter === 'favorites') {
       if (!entry.starred) return false
+    } else if (statusFilter === 'archive') {
+      // Archiv-Filter wird bereits serverseitig angewendet
+      // Hier könnten weitere Filterregeln für archivierte Einträge hinzugefügt werden
     } else if (statusFilter !== 'all' && entry.status !== statusFilter) {
       return false
     }
@@ -253,10 +361,30 @@ function IssuesPageContent() {
     return true
   })
 
+  // Funktion, die den Seitentitel basierend auf dem Filter zurückgibt
+  const getPageTitle = () => {
+    switch (statusFilter) {
+      case 'all':
+        return 'Inbox'
+      case 'unread':
+        return 'New'
+      case 'favorites':
+        return 'Liked'
+      case 'read':
+        return 'Opened'
+      case 'archive':
+        return 'Archive'
+      default:
+        return 'Inbox'
+    }
+  }
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground">Your Issues</h1>
+        <h1 className="text-3xl font-bold text-foreground">
+          {getPageTitle()}
+        </h1>
         <p className="text-muted-foreground mt-1">
           {filteredEntries.length > 0 ? (
             searchQuery.trim() || statusFilter !== 'all' 
@@ -281,15 +409,65 @@ function IssuesPageContent() {
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[180px] border-border">
               <div className="flex items-center">
-                <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder="All Issues" />
+                {/* Dynamisches Icon basierend auf dem aktuellen Filter */}
+                <span className="mr-2 text-muted-foreground">
+                  {(() => {
+                    switch (statusFilter) {
+                      case 'all': return <Inbox className="h-4 w-4" />
+                      case 'unread': return <MailWarning className="h-4 w-4" />
+                      case 'favorites': return <Heart className="h-4 w-4" />
+                      case 'read': return <MailOpen className="h-4 w-4" />
+                      case 'archive': return <Archive className="h-4 w-4" />
+                      default: return <Inbox className="h-4 w-4" />
+                    }
+                  })()} 
+                </span>
+                {/* Benutzerdefiniertes Rendering für den ausgewählten Wert */}
+                <span>
+                  {(() => {
+                    switch (statusFilter) {
+                      case 'all': return 'Inbox'
+                      case 'unread': return 'New'
+                      case 'favorites': return 'Liked'
+                      case 'read': return 'Opened'
+                      case 'archive': return 'Archive'
+                      default: return 'Inbox'
+                    }
+                  })()}
+                </span>
               </div>
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">
-              <SelectItem value="all">All Issues</SelectItem>
-              <SelectItem value="unread">New</SelectItem>
-              <SelectItem value="favorites">Liked</SelectItem>
-              <SelectItem value="read">Opened</SelectItem>
+              <SelectItem value="all">
+                <div className="flex items-center">
+                  <Inbox className="h-4 w-4 mr-2" />
+                  <span>Inbox</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="unread">
+                <div className="flex items-center">
+                  <MailWarning className="h-4 w-4 mr-2" />
+                  <span>New</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="favorites">
+                <div className="flex items-center">
+                  <Heart className="h-4 w-4 mr-2" />
+                  <span>Liked</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="read">
+                <div className="flex items-center">
+                  <MailOpen className="h-4 w-4 mr-2" />
+                  <span>Opened</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="archive">
+                <div className="flex items-center">
+                  <Archive className="h-4 w-4 mr-2" />
+                  <span>Archive</span>
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -7,7 +7,6 @@ import { useNavigationGestures } from '@/lib/hooks/use-navigation-gestures'
 // Navigation routes in order
 const MAIN_ROUTES = [
   '/issues',
-  '/archive',
   '/sources'
 ]
 
@@ -26,10 +25,9 @@ export function MainNavigation({ children }: { children: React.ReactNode }) {
     const normalizedPath = pathname?.split('?')[0].replace(/\/$/, '') || ''
     
     // Check if we're on a detail page
-    if (normalizedPath.includes('/issues/') || normalizedPath.includes('/archive/')) {
+    if (normalizedPath.includes('/issues/')) {
       // We're on a detail page, so we should return the parent route
-      if (normalizedPath.includes('/issues/')) return MAIN_ROUTES.indexOf('/issues')
-      if (normalizedPath.includes('/archive/')) return MAIN_ROUTES.indexOf('/archive')
+      return MAIN_ROUTES.indexOf('/issues')
     }
     
     // Check main routes

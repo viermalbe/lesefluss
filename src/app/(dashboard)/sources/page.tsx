@@ -13,7 +13,7 @@ import { parseFeed, generateGuidHash } from '@/lib/services/feed-parser'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { RefreshCw, Plus, Search, Filter } from 'lucide-react'
+import { RefreshCw, Plus, Search, Filter, X } from 'lucide-react'
 
 export default function SourcesPage() {
   const { user, loading } = useAuth()
@@ -389,8 +389,21 @@ export default function SourcesPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Your Sources</h1>
+      <div className="mb-6 relative">
+        {/* Close Button - positioned absolute to the header */}
+        <div className="absolute top-0 right-0 z-10 rounded-full border">
+          <Button 
+            onClick={() => router.back()}
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 rounded-full hover:bg-primary/10 transition-all duration-200"
+            aria-label="Close"
+            title="Close"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <h1 className="text-3xl font-bold text-foreground mb-2 pr-10">Sources</h1>
         <p className="text-muted-foreground mb-6">
           {subscriptions.length > 0 ? `${subscriptions.length} source${subscriptions.length === 1 ? '' : 's'} available` : 'No sources yet'}
         </p>

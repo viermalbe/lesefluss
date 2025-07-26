@@ -1,4 +1,4 @@
-import { EntryDetail } from '@/components/entries/entry-detail'
+import { redirect } from 'next/navigation'
 
 interface EntryDetailPageProps {
   params: Promise<{
@@ -7,19 +7,12 @@ interface EntryDetailPageProps {
 }
 
 /**
- * Archived entry detail page route
- * Displays full archived newsletter entry content with HTML rendering
+ * Redirect from archived entry detail page to issues entry detail page
+ * This ensures backward compatibility with existing URLs
  */
 export default async function ArchivedEntryDetailPage({ params }: EntryDetailPageProps) {
   const { id } = await params
-  return <EntryDetail entryId={id} />
-}
-
-// Generate metadata for the page
-export async function generateMetadata({ params }: EntryDetailPageProps) {
-  const { id } = await params
-  return {
-    title: `Archived Newsletter Entry - Lesefluss`,
-    description: 'Archivierter Newsletter-Eintrag im Detail',
-  }
+  
+  // Redirect to issues page with archive filter
+  redirect(`/issues/${id}?filter=archive`)
 }
