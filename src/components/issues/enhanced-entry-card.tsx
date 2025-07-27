@@ -289,16 +289,7 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
       <CardContent className="relative">
         {/* Action Icons - Top right corner */}
         <div className="absolute -top-2 right-4 flex gap-1 z-10">
-          {/* Archive Icon */}
-          <button
-            onClick={handleToggleArchived}
-            className={`rounded-md p-1 hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors ${
-              entry.archived ? 'text-primary' : 'text-muted-foreground'
-            }`}
-            title={entry.archived ? 'Unarchive' : 'Archive'}
-          >
-            <Archive className="w-4 h-4" />
-          </button>
+
           
           {/* Read/Unread Status Icon */}
           <button
@@ -315,7 +306,16 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
             )}
             <span className="sr-only">{isUnread ? 'New' : 'Opened'}</span>
           </button>
-          
+                    {/* Archive Icon */}
+                    <button
+            onClick={handleToggleArchived}
+            className={`rounded-md p-1 hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors ${
+              entry.archived ? 'text-primary' : 'text-muted-foreground'
+            }`}
+            title={entry.archived ? 'Unarchive' : 'Archive'}
+          >
+            <Archive className="w-4 h-4" />
+          </button>
           {/* Heart Icon for Favorites */}
           <button
             onClick={handleToggleStarred}

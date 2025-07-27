@@ -41,7 +41,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     next: string | null;
     source: 'issues' | 'archive';
   }>({ previous: null, next: null, source: 'issues' })
-  const [showBackToTop, setShowBackToTop] = useState(false)
+  // Keine showBackToTop-Variable mehr benötigt
 
   
   // Einfache Scroll-Position-Wiederherstellung mit sessionStorage
@@ -393,13 +393,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     }))
   }
 
-  // Scroll to top function
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    })
-  }
+  // Keine scrollToTop-Funktion mehr benötigt
 
   // Toggle archived status
   const toggleArchivedStatus = async () => {
@@ -459,27 +453,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     // Fetch entry when it changes
   }, [user, entryId])
   
-  // Scroll-Handler für Back-to-Top Button
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY
-      
-      // Zeige den Back-to-Top Button ab 500px Scroll-Position
-      if (currentScrollY > 500) {
-        setShowBackToTop(true)
-      } else {
-        setShowBackToTop(false)
-      }
-      
-      // Scroll-Position aktualisiert
-    }
-    
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    
-    return () => {
-      window.removeEventListener('scroll', handleScroll)
-    }
-  }, [])
+  // Kein Scroll-Handler mehr benötigt für Back-to-Top Button
 
   // Sanitize HTML content on client-side
   useEffect(() => {
@@ -582,20 +556,31 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
 
   return (
     <div className="min-h-screen pb-16">
-      {/* Back to Top Button */}
-      {showBackToTop && (
-        <div className="fixed bottom-20 right-4 z-50 transition-opacity duration-300 opacity-80 hover:opacity-100">
-          <Button 
-            onClick={scrollToTop}
-            size="icon"
-            className="h-10 w-10 rounded-full shadow-md bg-primary/90 hover:bg-primary text-primary-foreground transition-all duration-200"
-            aria-label="Back to top"
-            title="Back to top"
-          >
-            <ChevronUp className="h-5 w-5" />
-          </Button>
-        </div>
-      )}
+      {/* Floating Action Buttons (Archive & Like) */}
+      <div className="fixed bottom-20 right-4 z-50 flex flex-col gap-2">
+      <Button 
+          onClick={toggleStarredStatus}
+          size="icon"
+          variant="secondary"
+          className={`h-10 w-10 rounded-full shadow-md transition-all duration-200 ${entry?.starred ? 'text-primary' : 'bg-background/80 hover:bg-background'}`}
+          aria-label={entry?.starred ? 'Remove from likes' : 'Add to likes'}
+          title={entry?.starred ? 'Remove from likes' : 'Add to likes'}
+        >
+          <Heart className={`h-5 w-5 ${entry?.starred ? 'fill-current' : ''}`} />
+        </Button>
+        <Button 
+          onClick={toggleArchivedStatus}
+          size="icon"
+          variant="secondary"
+          className={`h-10 w-10 rounded-full shadow-md transition-all duration-200 ${entry?.archived ? 'text-primary' : 'bg-background/80 hover:bg-background'}`}
+          aria-label={entry?.archived ? 'Remove from archive' : 'Archive'}
+          title={entry?.archived ? 'Remove from archive' : 'Archive'}
+        >
+          <Archive className="h-5 w-5" />
+        </Button>
+        
+
+      </div>
 
       
       {/* Sticky header/footer */}
@@ -613,28 +598,15 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
             )}
           </div>
 
-          {/* Centered Buttons */}
-          <div className="flex items-center gap-2">
+          {/* Centered Close Button */}
+          <div className="flex items-center">
             <Button
               variant="ghost"
-              size="icon"
-              onClick={toggleArchivedStatus}
-              aria-pressed={entry?.archived}
-              title={entry?.archived ? 'Remove from archive' : 'Archive'}
-              className={entry?.archived ? 'text-primary' : ''}
+              size="sm"
+              onClick={navigateBack}
+              className="px-4"
             >
-              <Archive className="h-4 w-4" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleStarredStatus}
-              aria-pressed={entry?.starred}
-              title={entry?.starred ? 'Remove from likes' : 'Add to likes'}
-              className={entry?.starred ? 'text-rose-500' : ''}
-            >
-              <Heart className={`h-4 w-4 ${entry?.starred ? 'fill-current' : ''}`} />
+              Close
             </Button>
           </div>
           
@@ -655,21 +627,8 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
       {/* Main content */}
       <div className="container mx-auto px-0 sm:px-4 md:px-6 py-4 sm:max-w-4xl">
         <Card className="shadow-sm rounded-none sm:rounded-lg">
-          <CardHeader className="space-y-2 px-4 sm:px-6 relative">
-            {/* Close Button - positioned relative to card width */}
-            <div className="absolute top-0 right-4 sm:right-6 z-10 rounded-full border">
-              <Button 
-                onClick={navigateBack}
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 rounded-full hover:bg-primary/10 transition-all duration-200"
-                aria-label="Close"
-                title="Close"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <CardTitle className="text-xl sm:text-2xl pr-8">
+          <CardHeader className="space-y-2 px-4 sm:px-6">
+            <CardTitle className="text-xl sm:text-2xl">
               {entry.title}
             </CardTitle>
             <CardDescription className="flex items-center gap-2 text-base">

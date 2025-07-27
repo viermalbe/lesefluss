@@ -97,12 +97,19 @@ export class NewsletterParser {
         this.removeFixedDimensions($)
       }
       
+      if (this.options.enableDarkMode) {
+        this.adaptForDarkMode($)
+      }
+      
       if (this.options.fixTableLayouts) {
         this.fixTableLayouts($)
       }
       
       // Stelle sicher, dass alle Links in einem neuen Tab geöffnet werden
       this.optimizeAllLinks($)
+      
+      // Entferne Kill-the-Newsletter Footer-Links und HR
+      this.removeKillTheNewsletterFooter($)
       
       // Add responsive wrapper
       return this.wrapInResponsiveContainer($.html())
@@ -234,6 +241,126 @@ export class NewsletterParser {
   }
   
   /**
+   * Passt Farben für den Dark Mode an
+   * - Erkennt und ersetzt dunkle Textfarben durch CSS-Variablen
+   * - Entfernt Hintergrundfarben, die im Dark Mode problematisch sein könnten
+   */
+  private adaptForDarkMode($: cheerio.CheerioAPI): void {
+    // Liste der Farben, die als "dunkel" gelten und angepasst werden sollten
+    const darkColorPatterns = [
+      // Schwarz und Grautöne in verschiedenen Formaten
+      /color\s*:\s*black\s*;?/gi,
+      /color\s*:\s*#000\s*;?/gi,
+      /color\s*:\s*#000000\s*;?/gi,
+      /color\s*:\s*rgb\(\s*0\s*,\s*0\s*,\s*0\s*\)\s*;?/gi,
+      /color\s*:\s*rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*[\d\.]+\s*\)\s*;?/gi,
+      
+      // Grautöne
+      /color\s*:\s*#[0-9a-f]{6}\s*;?/gi,  // Alle Hex-Farben (werden später gefiltert)
+      /color\s*:\s*#[0-9a-f]{3}\s*;?/gi,   // Alle kurzen Hex-Farben (werden später gefiltert)
+      /color\s*:\s*rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)\s*;?/gi, // Alle RGB-Farben (werden später gefiltert)
+      /color\s*:\s*rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*[\d\.]+\s*\)\s*;?/gi // Alle RGBA-Farben
+    ]
+    
+    // Funktion zur Prüfung, ob eine Farbe dunkel ist
+    const isDarkColor = (color: string): boolean => {
+      // Entferne "color:" und Leerzeichen
+      color = color.replace(/color\s*:\s*/i, '').trim()
+      if (color.endsWith(';')) color = color.slice(0, -1)
+      
+      // Direkter Vergleich für einfache Fälle
+      if (color === 'black') return true
+      
+      // Hex-Farben verarbeiten
+      if (color.startsWith('#')) {
+        let r, g, b
+        
+        if (color.length === 4) { // #RGB Format
+          r = parseInt(color[1] + color[1], 16)
+          g = parseInt(color[2] + color[2], 16)
+          b = parseInt(color[3] + color[3], 16)
+        } else if (color.length === 7) { // #RRGGBB Format
+          r = parseInt(color.substring(1, 3), 16)
+          g = parseInt(color.substring(3, 5), 16)
+          b = parseInt(color.substring(5, 7), 16)
+        } else {
+          return false // Ungültiges Format
+        }
+        
+        // Berechne Helligkeit (Luminanz)
+        // Formel: (0.299*R + 0.587*G + 0.114*B)
+        const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        
+        // Wenn Helligkeit unter 0.6 liegt, gilt die Farbe als dunkel
+        return brightness < 0.6
+      }
+      
+      // RGB-Farben verarbeiten
+      const rgbMatch = color.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i)
+      if (rgbMatch) {
+        const r = parseInt(rgbMatch[1])
+        const g = parseInt(rgbMatch[2])
+        const b = parseInt(rgbMatch[3])
+        
+        const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        return brightness < 0.6
+      }
+      
+      // RGBA-Farben verarbeiten
+      const rgbaMatch = color.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d\.]+)\s*\)/i)
+      if (rgbaMatch) {
+        const r = parseInt(rgbaMatch[1])
+        const g = parseInt(rgbaMatch[2])
+        const b = parseInt(rgbaMatch[3])
+        
+        const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        return brightness < 0.6
+      }
+      
+      return false
+    }
+    
+    // Alle Elemente mit style-Attribut durchgehen
+    $('*[style*="color:"]').each((_, el) => {
+      let style = $(el).attr('style') || ''
+      
+      // Für jedes Farbmuster prüfen
+      for (const pattern of darkColorPatterns) {
+        // Finde alle Farbdefinitionen im style-Attribut
+        const colorMatches = style.match(pattern)
+        
+        if (colorMatches) {
+          for (const colorMatch of colorMatches) {
+            // Prüfe, ob die gefundene Farbe dunkel ist
+            if (isDarkColor(colorMatch)) {
+              // Ersetze die dunkle Farbe durch eine CSS-Variable
+              style = style.replace(colorMatch, 'color: var(--foreground) !important;')
+            }
+          }
+        }
+      }
+      
+      // Aktualisiere das style-Attribut
+      $(el).attr('style', style)
+    })
+    
+    // Entferne explizite Hintergrundfarben, die im Dark Mode problematisch sein könnten
+    $('*[style*="background"]').each((_, el) => {
+      let style = $(el).attr('style') || ''
+      
+      // Entferne Hintergrundfarben, aber behalte Hintergrundbilder
+      style = style
+        .replace(/background-color\s*:\s*[^;]+;?/gi, '')
+        .replace(/background\s*:\s*#[a-fA-F0-9]{3,6}\s*;?/gi, '')
+        .replace(/background\s*:\s*rgb[a]?\([^)]+\)\s*;?/gi, '')
+        .replace(/background\s*:\s*white\s*;?/gi, '')
+        .replace(/background\s*:\s*#fff[f]?\s*;?/gi, '')
+      
+      $(el).attr('style', style)
+    })
+  }
+  
+  /**
    * Fix table layouts for better responsive behavior
    */
   private fixTableLayouts($: cheerio.CheerioAPI): void {
@@ -351,48 +478,60 @@ export class NewsletterParser {
    */
   private isCellEmpty($: cheerio.CheerioAPI, cell: any): boolean {
     const content = $(cell).text().trim()
-    const html = $(cell).html() || ''
-    
-    // Empty or whitespace only
-    if (!content || content === '&nbsp;' || content === ' ' || content === '') {
-      return true
-    }
-    
-    // Check if HTML contains only &nbsp; or whitespace
-    if (html === '&nbsp;' || html.trim() === '&nbsp;' || /^\s*$/.test(html)) {
-      return true
-    }
-    
-    // Very short content that's likely just spacing
-    if (content.length <= 3 && /^[\s\u00A0]*$/.test(content)) {
-      return true
-    }
-    
-    // Check for spacer images (small dimensions)
-    const images = $(cell).find('img')
-    if (images.length > 0) {
-      let allImagesAreSpacers = true
+    return content === '' || content === '&nbsp;' || content === ' '
+  }
+  
+  /**
+   * Entfernt den Kill-the-Newsletter Footer-Link und den <hr> davor
+   * Diese Links werden automatisch von Kill-the-Newsletter am Ende jedes Newsletters eingefügt
+   */
+  private removeKillTheNewsletterFooter($: cheerio.CheerioAPI): void {
+    // Suche nach dem spezifischen Kill-the-Newsletter Link-Pattern
+    $('a[href*="kill-the-newsletter.com/feeds/"]').each((_, link) => {
+      const $link = $(link)
+      const linkText = $link.text().trim()
       
-      images.each((_, img) => {
-        const width = $(img).attr('width') || '0'
-        const height = $(img).attr('height') || '0'
+      // Prüfe, ob es sich um den Footer-Link handelt
+      if (linkText.includes('Kill the Newsletter') || linkText.includes('feed settings')) {
+        // Finde das übergeordnete <small> Element (falls vorhanden)
+        const $small = $link.closest('small')
         
-        const w = parseInt(width.replace(/[^0-9]/g, '')) || 0
-        const h = parseInt(height.replace(/[^0-9]/g, '')) || 0
+        // Finde das übergeordnete <p> oder <div> Element
+        const $parent = $small.length ? $small.parent('p, div') : $link.parent('p, div')
         
-        // Not a spacer if dimensions are larger than 20px
-        if (w > 20 || h > 20) {
-          allImagesAreSpacers = false
+        // Verschiedene Möglichkeiten, den <hr> zu finden
+        
+        // 1. <hr> direkt vor dem Elternelement
+        let $prevHr = $parent.prev('hr')
+        
+        // 2. <hr> als Geschwisterelement auf gleicher Ebene (wenn in einem Container)
+        if (!$prevHr.length) {
+          // Suche nach dem nächsten <hr> oberhalb im Dokument
+          $prevHr = $parent.prevAll('hr').first()
         }
-      })
-      
-      // If cell only contains spacer images and minimal text
-      if (allImagesAreSpacers && content.length < 10) {
-        return true
+        
+        // 3. <hr> vor einem Container, der alles enthält
+        if (!$prevHr.length && $parent.parent().length) {
+          $prevHr = $parent.parent().prev('hr')
+        }
+        
+        // Entferne den <hr>, falls gefunden
+        if ($prevHr.length) {
+          $prevHr.remove()
+        }
+        
+        // Entferne das Elternelement mit dem Link
+        if ($parent.length) {
+          $parent.remove()
+        } else if ($small.length) {
+          // Oder entferne das <small>-Element, falls vorhanden
+          $small.remove()
+        } else {
+          // Falls kein Elternelement gefunden wurde, entferne nur den Link
+          $link.remove()
+        }
       }
-    }
-    
-    return false
+    })
   }
   
   /**

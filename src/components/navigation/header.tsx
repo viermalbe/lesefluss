@@ -17,7 +17,7 @@ export function Header() {
       <div className="container mx-auto flex h-14 items-center px-4">
         {/* Logo - Linksbündig */}
         <div className="flex">
-          <Link href="/issues" className="flex items-center space-x-2">
+          <Link href="/issues?filter=all" className="flex items-center space-x-2">
             <Signature className="h-6 w-6" />
             <span className="font-bold">
               Lesefluss
@@ -26,7 +26,7 @@ export function Header() {
         </div>
 
         {/* Rechtsbündige Icons: Sources, Theme, Sign out */}
-        <div className="ml-auto flex items-center space-x-4">
+        <div className="ml-auto flex items-center space-x-1">
           {/* Sources Icon */}
           <TooltipProvider>
             <Tooltip>

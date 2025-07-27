@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { EnhancedEntryCard } from '@/components/issues/enhanced-entry-card'
-import { BookOpen, Search, Filter, RefreshCw, Inbox, Mail, MailOpen, Heart, Archive } from 'lucide-react'
+import { BookOpen, Search, Filter, RefreshCw, Inbox, Mail, MailOpen, Heart, Archive, Rabbit, Bubbles, Signature } from 'lucide-react'
 import { useScrollPosition } from '@/lib/utils/scroll-position'
 import { InfiniteScroll } from '@/components/ui/infinite-scroll'
 import Link from 'next/link'
@@ -70,7 +70,7 @@ function IssuesPageContent() {
       
       // Check for URL parameters
       const sourceFromUrl = searchParams.get('source')
-      const statusFromUrl = searchParams.get('status')
+      const filterFromUrl = searchParams.get('filter')
       
       // Load saved state first
       if (savedSearch) setSearchQuery(savedSearch)
@@ -80,27 +80,41 @@ function IssuesPageContent() {
       if (sourceFromUrl) {
         setSearchQuery(sourceFromUrl)
       }
-      if (statusFromUrl) {
-        setStatusFilter(statusFromUrl)
+      if (filterFromUrl) {
+        console.log('Setting filter from URL:', filterFromUrl)
+        setStatusFilter(filterFromUrl)
       }
       
       setIsStateLoaded(true)
     }
   }, [searchParams])
 
-  // Save search query to localStorage (only after initial load)
+  // Update URL and save to localStorage when search or filter changes
   useEffect(() => {
     if (typeof window !== 'undefined' && isStateLoaded) {
+      // Save to localStorage
       localStorage.setItem('lesefluss-search-query', searchQuery)
-    }
-  }, [searchQuery, isStateLoaded])
-
-  // Save filter state to localStorage (only after initial load)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isStateLoaded) {
       localStorage.setItem('lesefluss-filter-state', statusFilter)
+      
+      // Update URL with current filter and search
+      const params = new URLSearchParams()
+      
+      if (searchQuery) {
+        params.set('source', searchQuery)
+      }
+      
+      if (statusFilter !== 'all') {
+        params.set('filter', statusFilter)
+      }
+      
+      // Use replaceState to update URL without adding to history
+      const newUrl = params.toString() 
+        ? `${window.location.pathname}?${params.toString()}` 
+        : window.location.pathname
+      
+      window.history.replaceState({}, '', newUrl)
     }
-  }, [statusFilter, isStateLoaded])
+  }, [searchQuery, statusFilter, isStateLoaded])
   
   // Verbesserte Scroll-Position-Verwaltung mit automatischer Wiederherstellung
   useEffect(() => {
@@ -542,10 +556,10 @@ function IssuesPageContent() {
       ) : filteredEntries.length === 0 ? (
         <div className="text-center py-16">
           <div className="max-w-md mx-auto">
-            <BookOpen className="mx-auto h-16 w-16 text-gray-400 mb-6" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">Nothing to see here!</h3>
-            <p className="text-gray-600 mb-6 leading-relaxed">
-              Awesome! You are up to date. 
+            <Signature className="mx-auto h-16 w-16 text-foreground mb-6" />
+            <h3 className="text-xl font-semibold text-foreground mb-3">Inbox Zero</h3>
+            <p className="text-muted-foreground mb-6 leading-relaxed">
+            You’re all caught up.
             </p>
             <Link href="/sources">
               <Button size="lg" className="px-6">
