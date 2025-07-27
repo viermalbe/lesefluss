@@ -2,14 +2,16 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { calculateReadingTime, formatReadingTime } from '@/lib/utils/reading-time'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, ChevronUp, Heart, Archive, ListFilter, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronUp, Heart, Archive, ListFilter, X, BookOpen, LucideMenuSquare, LucideMenu } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { getRelativeTime } from '@/lib/utils/content-utils'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/hooks'
 import { NewsletterViewer } from '@/components/newsletter/newsletter-viewer'
+import { Readability } from '@mozilla/readability'
 
 import {
   Card,
@@ -41,9 +43,29 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
     next: string | null;
     source: 'issues' | 'archive';
   }>({ previous: null, next: null, source: 'issues' })
-  // Keine showBackToTop-Variable mehr benötigt
+  // Geschätzte Lesezeit
+  const [readingTime, setReadingTime] = useState<number>(0)
 
-  
+  // Reader Mode State
+  const [isReaderMode, setIsReaderMode] = useState(() => {
+    // Beim ersten Rendering aus localStorage laden
+    if (typeof window !== 'undefined') {
+      const savedMode = localStorage.getItem('lesefluss-reader-mode')
+      return savedMode === 'true'
+    }
+    return false
+  })
+  const [readerContent, setReaderContent] = useState('')
+
+  // Reader Mode Einstellung speichern
+  const toggleReaderMode = () => {
+    const newMode = !isReaderMode
+    setIsReaderMode(newMode)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lesefluss-reader-mode', newMode.toString())
+    }
+  }
+
   // Einfache Scroll-Position-Wiederherstellung mit sessionStorage
   const scrollPositionKey = `scroll-position-${entryId}`
   
@@ -455,16 +477,40 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
   
   // Kein Scroll-Handler mehr benötigt für Back-to-Top Button
 
-  // Sanitize HTML content on client-side
+  // Sanitize HTML content, handle links, and calculate reading time
   useEffect(() => {
-    if (entry?.content_html && typeof window !== 'undefined') {
-      // Einfache DOMPurify-Bereinigung ohne Transformationen
-      const basicSanitized = DOMPurify.sanitize(entry.content_html, {
-        ADD_ATTR: ['target'],
-        FORBID_TAGS: ['script', 'object', 'embed', 'form', 'input', 'button'],
-        FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover']
-      })
-      setSanitizedContent(basicSanitized)
+    if (entry?.content_html) {
+      // Sanitize HTML content
+      const sanitized = DOMPurify.sanitize(entry.content_html)
+      setSanitizedContent(sanitized)
+      
+      // Calculate reading time
+      const estimatedMinutes = calculateReadingTime(sanitized)
+      setReadingTime(estimatedMinutes)
+      
+      // Parse content with Readability for reader mode
+      try {
+        // Create a DOM parser
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(sanitized, 'text/html')
+        
+        // Apply Readability
+        const reader = new Readability(doc)
+        const article = reader.parse()
+        
+        if (article && article.content) {
+          // Set reader content
+          setReaderContent(article.content)
+        } else {
+          console.error('Readability could not parse the content')
+          // Fallback to original content
+          setReaderContent(sanitized || '')
+        }
+      } catch (error) {
+        console.error('Error parsing with Readability:', error)
+        // Fallback to original content
+        setReaderContent(sanitized || '')
+      }
     }
   }, [entry?.content_html])
   
@@ -556,9 +602,19 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
 
   return (
     <div className="min-h-screen pb-16">
-      {/* Floating Action Buttons (Archive & Like) */}
+      {/* Floating Action Buttons (Archive, Like & Reader Mode) */}
       <div className="fixed bottom-20 right-4 z-50 flex flex-col gap-2">
-      <Button 
+        <Button 
+          onClick={toggleReaderMode}
+          size="icon"
+          variant="secondary"
+          className={`h-10 w-10 rounded-full shadow-md transition-all duration-200 ${isReaderMode ? 'text-primary' : 'bg-background/80 hover:bg-background'}`}
+          aria-label={isReaderMode ? 'Exit reader mode' : 'Reader mode'}
+          title={isReaderMode ? 'Exit reader mode' : 'Reader mode'}
+        >
+          <BookOpen className="h-5 w-5" />
+        </Button>
+        <Button 
           onClick={toggleStarredStatus}
           size="icon"
           variant="secondary"
@@ -578,8 +634,6 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
         >
           <Archive className="h-5 w-5" />
         </Button>
-        
-
       </div>
 
       
@@ -590,7 +644,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
           <div>
             {adjacentEntries.next ? (
               <Button variant="ghost" size="sm" onClick={navigateToNext} title="Newer entry">
-                <ChevronLeft className="h-4 w-4 mr-1" />
+                <ChevronLeft className="h-4 w-4 mr-1 text-primary" />
                 Newer
               </Button>
             ) : (
@@ -604,9 +658,9 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
               variant="ghost"
               size="sm"
               onClick={navigateBack}
-              className="px-4"
+              className="px-4 text-foreground"
             >
-              Close
+              <LucideMenu />
             </Button>
           </div>
           
@@ -615,7 +669,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
             {adjacentEntries.previous ? (
               <Button variant="ghost" size="sm" onClick={navigateToPrevious} title="Older entry">
                 Older
-                <ChevronRight className="h-4 w-4 ml-1" />
+                <ChevronRight className="h-4 w-4 ml-1 text-primary" />
               </Button>
             ) : (
               <div className="w-[90px]"></div>
@@ -637,11 +691,26 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
               </span>
               <span>•</span>
               <span>{getRelativeTime(entry.published_at || entry.created_at)}</span>
+              <span>•</span>
+              <span title="Geschätzte Lesezeit">{formatReadingTime(readingTime)}</span>
             </CardDescription>
           </CardHeader>
           
           <CardContent className="px-4 sm:px-6">
-            {sanitizedContent ? (
+            {isReaderMode ? (
+              readerContent ? (
+                <div className="reader-mode px-2 sm:px-4">
+                  <div 
+                    className="prose dark:prose-invert max-w-none prose-headings:mt-8 prose-headings:mb-4 prose-p:my-4 prose-li:my-2 prose-img:my-8 prose-blockquote:my-6 prose-hr:my-8" 
+                    dangerouslySetInnerHTML={{ __html: readerContent }}
+                  />
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Reader-Modus wird geladen...</p>
+                </div>
+              )
+            ) : sanitizedContent ? (
               <NewsletterViewer
                 htmlContent={sanitizedContent}
                 maxWidth="100%"
