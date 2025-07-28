@@ -53,6 +53,7 @@ function IssuesPageContent() {
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMoreEntries, setHasMoreEntries] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [totalEntriesCount, setTotalEntriesCount] = useState<number | null>(null)
   
   // Verhindere automatisches Neuladen beim Fokuswechsel
   useEffect(() => {
@@ -142,7 +143,7 @@ function IssuesPageContent() {
 
   // Fetch entries function with pagination
   const fetchEntries = async (page = 1, reset = true) => {
-    if (!user) return
+    if (!user) return false
     
     if (reset) {
       setEntriesLoading(true)
@@ -152,6 +153,14 @@ function IssuesPageContent() {
     }
     
     try {
+      // Sicherheitsprüfung: Wenn wir bereits alle Einträge haben, nicht mehr laden
+      if (!reset && entries.length > 0 && totalEntriesCount !== null && entries.length >= totalEntriesCount) {
+        console.log('Alle Einträge wurden bereits geladen, keine weiteren Anfragen nötig')
+        setHasMoreEntries(false)
+        setIsLoadingMore(false)
+        return false
+      }
+      
       // Calculate pagination parameters
       const limit = ITEMS_PER_PAGE
       const from = (page - 1) * limit
@@ -188,27 +197,60 @@ function IssuesPageContent() {
       
       if (error) {
         console.error('Error fetching entries:', error)
-        return
+        setIsLoadingMore(false)
+        if (reset) setEntriesLoading(false)
+        return false
+      }
+      
+      // Prüfen, ob wir tatsächlich neue Daten erhalten haben
+      if (!data || data.length === 0) {
+        setHasMoreEntries(false)
+        setIsLoadingMore(false)
+        if (reset) setEntriesLoading(false)
+        return false
       }
       
       // Update state based on whether this is a reset or load more
       if (reset) {
-        setEntries(data || [])
+        setEntries(data)
       } else {
-        setEntries(prev => [...prev, ...(data || [])])
+        // Prüfe auf Duplikate, um Endlosschleifen zu vermeiden
+        const existingIds = new Set(entries.map(entry => entry.id))
+        const newEntries = data.filter(entry => !existingIds.has(entry.id))
+        
+        // Wenn keine neuen Einträge vorhanden sind, beenden wir das Laden
+        if (newEntries.length === 0) {
+          setHasMoreEntries(false)
+          setIsLoadingMore(false)
+          return false
+        }
+        
+        setEntries(prev => [...prev, ...newEntries])
       }
       
-      // Check if there are more entries to load
-      const totalFetched = (page * limit)
-      const hasMore = count ? totalFetched < count : false
-      setHasMoreEntries(hasMore)
+      // Speichere die Gesamtanzahl der Einträge und prüfe, ob es weitere gibt
+      if (count !== undefined && count !== null) {
+        setTotalEntriesCount(count)
+        
+        // Berechne, ob es weitere Einträge gibt
+        const totalFetched = reset ? data.length : entries.length + (reset ? 0 : data.length)
+        const hasMoreEntries = totalFetched < count
+        
+        console.log(`Loaded ${totalFetched} of ${count} total entries. Has more: ${hasMoreEntries}`)
+        setHasMoreEntries(hasMoreEntries)
+      } else {
+        // Wenn keine Anzahl zurückgegeben wurde, gehen wir davon aus, dass es keine weiteren gibt
+        setHasMoreEntries(false)
+      }
       
       // Update current page if this was a successful load more
       if (!reset && data && data.length > 0) {
         setCurrentPage(page)
       }
       
-      return hasMore
+      // Gib zurück, ob es weitere Einträge gibt
+      const currentTotalFetched = reset ? data.length : entries.length + (reset ? 0 : data.length)
+      return count !== undefined && count !== null ? currentTotalFetched < count : false
     } catch (error) {
       console.error('Error fetching entries:', error)
       return false
@@ -424,7 +466,18 @@ function IssuesPageContent() {
   
   // Handler for loading more entries
   const handleLoadMore = async (): Promise<boolean> => {
-    if (isLoadingMore || !hasMoreEntries) return false
+    if (isLoadingMore || !hasMoreEntries) {
+      console.log('Verhindere doppeltes Laden: isLoadingMore =', isLoadingMore, 'hasMoreEntries =', hasMoreEntries)
+      return false
+    }
+    
+    // Prüfe nochmals, ob wir bereits alle Einträge haben
+    if (totalEntriesCount !== null && entries.length >= totalEntriesCount) {
+      console.log('Alle Einträge wurden bereits geladen, keine weiteren Anfragen nötig')
+      setHasMoreEntries(false)
+      return false
+    }
+    
     const nextPage = currentPage + 1
     const result = await fetchEntries(nextPage, false)
     // Ensure we always return a boolean value
