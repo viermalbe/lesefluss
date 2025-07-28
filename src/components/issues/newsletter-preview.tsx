@@ -7,44 +7,7 @@ interface NewsletterPreviewProps {
 }
 
 export function NewsletterPreview({ htmlContent, sourceImageUrl, className = '' }: NewsletterPreviewProps) {
-  // Extract first meaningful image from HTML (avoid tracking pixels)
-  const getFirstImage = (html: string): string | null => {
-    const imgMatches = html.match(/<img[^>]+src="([^"]+)"[^>]*>/gi)
-    if (!imgMatches) return null
-    
-    for (const imgTag of imgMatches) {
-      const srcMatch = imgTag.match(/src="([^"]+)"/i)
-      if (!srcMatch) continue
-      
-      const src = srcMatch[1]
-      
-      // Skip common tracking pixel patterns
-      if (
-        src.includes('track') ||
-        src.includes('pixel') ||
-        src.includes('beacon') ||
-        src.includes('analytics') ||
-        src.includes('1x1') ||
-        src.includes('transparent') ||
-        src.endsWith('.gif') && src.includes('1bwq5') // WIRED tracking pattern
-      ) {
-        continue
-      }
-      
-      // Skip very small images (likely tracking)
-      const widthMatch = imgTag.match(/width=["']?(\d+)/i)
-      const heightMatch = imgTag.match(/height=["']?(\d+)/i)
-      if (widthMatch && heightMatch) {
-        const width = parseInt(widthMatch[1])
-        const height = parseInt(heightMatch[1])
-        if (width < 50 || height < 50) continue
-      }
-      
-      return src
-    }
-    
-    return null
-  }
+  // Wir extrahieren keine Bilder mehr aus dem HTML-Inhalt, um falsche Bilder zu vermeiden
 
   // Extract clean text preview
   const getTextPreview = (html: string): string => {
@@ -55,10 +18,9 @@ export function NewsletterPreview({ htmlContent, sourceImageUrl, className = '' 
       .substring(0, 150)
   }
 
-  const firstImage = getFirstImage(htmlContent)
   const textPreview = getTextPreview(htmlContent)
-  // Prefer source image over newsletter image to avoid tracking pixels
-  const displayImage = sourceImageUrl || firstImage
+  // Verwende ausschließlich das Quellbild, um falsche Bilder zu vermeiden
+  const displayImage = sourceImageUrl
 
   return (
     <div className={`bg-gray-50 rounded border border-gray-200 overflow-hidden ${className}`}>

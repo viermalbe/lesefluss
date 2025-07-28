@@ -374,6 +374,7 @@ body {
 
 /* Mobile-specific adjustments */
 @media (max-width: 640px) {
+
   .newsletter-content {
     font-size: 14px;
     line-height: 1.5;

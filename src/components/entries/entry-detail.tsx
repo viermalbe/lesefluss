@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { calculateReadingTime, formatReadingTime } from '@/lib/utils/reading-time'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, ChevronUp, Heart, Archive, ListFilter, X, BookOpen, LucideMenuSquare, LucideMenu } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronUp, Heart, Archive, ListFilter, X, BookOpen, LucideMenuSquare, LucideMenu, LucideCircleChevronDown, LucideMinimize, LucideX, LucideMinimize2, LucideCircleX, LucideSquareX, LucideSignature } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { getRelativeTime } from '@/lib/utils/content-utils'
 import { supabase } from '@/lib/supabase/client'
@@ -644,7 +644,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
           <div>
             {adjacentEntries.next ? (
               <Button variant="ghost" size="sm" onClick={navigateToNext} title="Newer entry">
-                <ChevronLeft className="h-4 w-4 mr-1 text-primary" />
+                <ChevronLeft className="h-4 w-4 mr-1 text-foreground" />
                 Newer
               </Button>
             ) : (
@@ -660,7 +660,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
               onClick={navigateBack}
               className="px-4 text-foreground"
             >
-              <LucideMenu />
+              Close
             </Button>
           </div>
           
@@ -669,7 +669,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
             {adjacentEntries.previous ? (
               <Button variant="ghost" size="sm" onClick={navigateToPrevious} title="Older entry">
                 Older
-                <ChevronRight className="h-4 w-4 ml-1 text-primary" />
+                <ChevronRight className="h-4 w-4 ml-1 text-foreground" />
               </Button>
             ) : (
               <div className="w-[90px]"></div>
@@ -679,9 +679,9 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
       </div>
 
       {/* Main content */}
-      <div className="container mx-auto px-0 sm:px-4 md:px-6 py-4 sm:max-w-4xl">
-        <Card className="shadow-sm rounded-none sm:rounded-lg">
-          <CardHeader className="space-y-2 px-4 sm:px-6">
+      <div className="container mx-auto px-0 sm:px-4 md:px-6 py-0 sm:py-4 sm:max-w-4xl">
+        <Card className="shadow-none sm:shadow-sm rounded-none sm:rounded-lg border-0 sm:border">
+          <CardHeader className="space-y-2 px-4 sm:px-6 pt-0 sm:pt-6">
             <CardTitle className="text-xl sm:text-2xl">
               {entry.title}
             </CardTitle>
@@ -699,7 +699,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
           <CardContent className="px-4 sm:px-6">
             {isReaderMode ? (
               readerContent ? (
-                <div className="reader-mode px-2 sm:px-4">
+                <div className="reader-mode sm:px-4">
                   <div 
                     className="prose dark:prose-invert max-w-none prose-headings:mt-8 prose-headings:mb-4 prose-p:my-4 prose-li:my-2 prose-img:my-8 prose-blockquote:my-6 prose-hr:my-8" 
                     dangerouslySetInnerHTML={{ __html: readerContent }}
@@ -729,6 +729,7 @@ export function EntryDetail({ entryId }: EntryDetailProps) {
             )}
           </CardContent>
         </Card>
+        <div className="flex justify-center"><LucideSignature className="mt-12 h-12 w-12" /></div>
       </div>
     </div>
 
