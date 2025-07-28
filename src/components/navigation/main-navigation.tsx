@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { useNavigationGestures } from '@/lib/hooks/use-navigation-gestures'
 
 // Navigation routes in order
 const MAIN_ROUTES = [
@@ -61,13 +60,7 @@ export function MainNavigation({ children }: { children: React.ReactNode }) {
     return true
   }
   
-  // Setup navigation gestures
-  useNavigationGestures({
-    onNext: navigateToNextRoute,
-    onPrevious: navigateToPreviousRoute,
-    containerRef,
-    enabled: isMainRoute()
-  })
+  // Navigation gestures wurden entfernt
   
   return (
     <div ref={containerRef} className="flex flex-col min-h-screen">
