@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ImageUpload } from './image-upload'
 import { 
-  Copy, 
   ExternalLink, 
   Trash2, 
   Edit2, 
@@ -15,7 +14,6 @@ import {
   X, 
   Pause, 
   Play,
-  Mail,
   Image as ImageIcon,
   Settings
 } from 'lucide-react'
@@ -53,29 +51,7 @@ export function SourceSettingsModal({
   const [isEditingImage, setIsEditingImage] = useState(false)
   const [editImageUrl, setEditImageUrl] = useState(subscription.image_url || '')
 
-  // Extract feed ID from Kill the Newsletter URL
-  const getFeedId = () => {
-    const match = subscription.feed_url.match(/\/feeds\/([^.]+)(?:\.xml)?$/)
-    return match ? match[1] : null
-  }
-
-  const handleOpenFeedSettings = () => {
-    const feedId = getFeedId()
-    if (feedId) {
-      window.open(`https://kill-the-newsletter.com/feeds/${feedId}`, '_blank')
-    } else {
-      toast.error('Could not extract feed ID from URL')
-    }
-  }
-
-  const handleCopyEmail = async () => {
-    try {
-      await navigator.clipboard.writeText(subscription.ktln_email)
-      toast.success('Email address copied to clipboard!')
-    } catch (err) {
-      toast.error('Failed to copy email address')
-    }
-  }
+  // KTLN-specific actions removed
 
   const handleUpdateTitle = async () => {
     if (!editTitle.trim()) {
@@ -256,26 +232,7 @@ export function SourceSettingsModal({
             </div>
           </div>
 
-          {/* Email Section */}
-          <div>
-            <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-              <Mail className="h-3 w-3" />
-              Email Address
-            </label>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-mono bg-muted p-2 rounded flex-1 break-all">
-                {subscription.ktln_email}
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCopyEmail}
-                className="shrink-0"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          {/* Email section removed (KTLN-specific) */}
 
           {/* Image Section */}
           <div>
@@ -439,16 +396,7 @@ export function SourceSettingsModal({
                 </a>
               </Button>
               
-              {getFeedId() && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleOpenFeedSettings}
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  Feed Settings
-                </Button>
-              )}
+              {/* KTLN Feed Settings removed */}
               
               <Button
                 variant="outline"

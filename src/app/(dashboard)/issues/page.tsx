@@ -66,20 +66,22 @@ function IssuesPageContent() {
   // Load persistent state from localStorage and URL parameters
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedSearch = localStorage.getItem('lesefluss-search-query')
       const savedFilter = localStorage.getItem('lesefluss-filter-state')
       
       // Check for URL parameters
       const sourceFromUrl = searchParams.get('source')
       const filterFromUrl = searchParams.get('filter')
       
-      // Load saved state first
-      if (savedSearch) setSearchQuery(savedSearch)
+      // Load saved filter, but drive searchQuery from URL only
       if (savedFilter) setStatusFilter(savedFilter)
-      
-      // Override with URL parameters if present
+
+      // If URL provides a source, use it; otherwise clear any persisted source filter
       if (sourceFromUrl) {
         setSearchQuery(sourceFromUrl)
+      } else {
+        setSearchQuery('')
+        // Also clear persisted search to avoid reappearing source
+        localStorage.removeItem('lesefluss-search-query')
       }
       if (filterFromUrl) {
         console.log('Setting filter from URL:', filterFromUrl)
@@ -94,16 +96,17 @@ function IssuesPageContent() {
   useEffect(() => {
     if (typeof window !== 'undefined' && isStateLoaded) {
       // Save to localStorage
-      localStorage.setItem('lesefluss-search-query', searchQuery)
+      // We no longer persist a source filter for Issues unless explicitly set via URL
+      if (searchQuery) {
+        localStorage.setItem('lesefluss-search-query', searchQuery)
+      } else {
+        localStorage.removeItem('lesefluss-search-query')
+      }
       localStorage.setItem('lesefluss-filter-state', statusFilter)
       
       // Update URL with current filter and search
       const params = new URLSearchParams()
-      
-      if (searchQuery) {
-        params.set('source', searchQuery)
-      }
-      
+      // Do NOT auto-inject 'source' param; only keep filter in URL
       if (statusFilter !== 'all') {
         params.set('filter', statusFilter)
       }
@@ -177,7 +180,8 @@ function IssuesPageContent() {
             title,
             user_id,
             status,
-            image_url
+            image_url,
+            feed_url
           )
         `, { count: 'exact' }) // Request exact count for pagination
         .eq('subscription.user_id', user.id)
@@ -637,7 +641,7 @@ function IssuesPageContent() {
           }
           endComponent={
             <div className="text-center py-4 text-muted-foreground">
-              You've reached the end
+              You've reached the end.
             </div>
           }
         >

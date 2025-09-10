@@ -113,13 +113,36 @@ export async function POST(request: NextRequest) {
         
         // Process each entry in the feed
         for (const feedEntry of parsedFeed.entries) {
+          // Resolve a permalink for this entry
+          const deriveFeedId = (feedUrl?: string | null) => {
+            if (!feedUrl) return null
+            const m = feedUrl.match(/\/feeds\/([^.\/]+)(?:\.xml)?$/)
+            return m ? m[1] : null
+          }
+          const deriveEntryId = () => {
+            // Prefer extracting from the entry's link if present
+            const fromLink = (feedEntry.link || '').match(/\/entries\/([A-Za-z0-9_-]+)\.html/)
+            if (fromLink) return fromLink[1]
+            // Fallback: try to extract from GUID (KTLN Atom uses urn:kill-the-newsletter:{entryId})
+            if (feedEntry.guid) {
+              const m = String(feedEntry.guid).match(/([^:]+)$/)
+              if (m) return m[1]
+            }
+            return null
+          }
+          const feedId = deriveFeedId(subscription.feed_url)
+          const entryId = deriveEntryId()
+          const derivedLink = feedId && entryId
+            ? `https://kill-the-newsletter.com/feeds/${feedId}/entries/${entryId}.html`
+            : null
+          const resolvedLink = feedEntry.link || derivedLink || null
           // Generate a hash for the GUID to ensure uniqueness
           const guidHash = generateGuidHash(feedEntry.guid, feedEntry.published_at)
           
           // Check if entry already exists
           const { data: existingEntry } = await supabase
             .from('entries')
-            .select('id')
+            .select('id, link')
             .eq('guid_hash', guidHash)
             .eq('subscription_id', subscription.id)
             .single()
@@ -133,16 +156,26 @@ export async function POST(request: NextRequest) {
                 guid_hash: guidHash,
                 title: feedEntry.title,
                 content_html: feedEntry.content,
+                link: resolvedLink,
                 published_at: feedEntry.published_at,
                 status: 'unread',
                 starred: false,
                 archived: false
               })
-            
+
             if (insertError) {
               console.error(`Error inserting entry: ${insertError.message}`)
             } else {
               syncedEntries++
+            }
+          } else if (!existingEntry.link && resolvedLink) {
+            // Backfill missing link for existing row
+            const { error: updateError } = await supabase
+              .from('entries')
+              .update({ link: resolvedLink })
+              .eq('id', existingEntry.id)
+            if (updateError) {
+              console.warn('Backfill link update failed:', updateError.message)
             }
           }
         }

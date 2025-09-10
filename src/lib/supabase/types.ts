@@ -39,7 +39,7 @@ export type Database = {
           user_id: string
           title: string
           feed_url: string
-          ktln_email: string
+          ktln_email: string | null
           status: 'active' | 'paused' | 'error'
           image_url: string | null
           last_sync_at: string | null
@@ -52,7 +52,7 @@ export type Database = {
           user_id: string
           title: string
           feed_url: string
-          ktln_email: string
+          ktln_email?: string | null
           status?: 'active' | 'paused' | 'error'
           image_url?: string | null
           last_sync_at?: string | null
@@ -65,7 +65,7 @@ export type Database = {
           user_id?: string
           title?: string
           feed_url?: string
-          ktln_email?: string
+          ktln_email?: string | null
           status?: 'active' | 'paused' | 'error'
           image_url?: string | null
           last_sync_at?: string | null
@@ -88,8 +88,10 @@ export type Database = {
           id: string
           subscription_id: string
           guid_hash: string
+          guid?: string | null
           title: string
           content_html: string
+          link: string | null
           published_at: string
           status: 'unread' | 'read'
           starred: boolean
@@ -100,8 +102,10 @@ export type Database = {
           id?: string
           subscription_id: string
           guid_hash: string
+          guid?: string | null
           title: string
           content_html: string
+          link?: string | null
           published_at: string
           status?: 'unread' | 'read'
           starred?: boolean
@@ -112,8 +116,10 @@ export type Database = {
           id?: string
           subscription_id?: string
           guid_hash?: string
+          guid?: string | null
           title?: string
           content_html?: string
+          link?: string | null
           published_at?: string
           status?: 'unread' | 'read'
           starred?: boolean

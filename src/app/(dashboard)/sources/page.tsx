@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useScrollPosition } from '@/lib/utils/scroll-position'
 import { useAuth } from '@/lib/hooks'
-import { AddSourceDialog } from '@/components/sources/add-source-dialog'
+import { AddFeedDialog } from '@/components/sources/add-feed-dialog'
 import { SourceCard } from '@/components/sources/source-card'
 import { api } from '@/lib/trpc/client'
 import { supabase } from '@/lib/supabase/client'
@@ -222,35 +222,35 @@ export default function SourcesPage() {
           }
           
           let syncedEntries = 0
-          
-          // Process each entry in the feed
-          for (const feedEntry of parsedFeed.entries) {
-            // Generate a hash for the GUID to ensure uniqueness
-            const guidHash = generateGuidHash(feedEntry.guid, feedEntry.published_at)
-            
-            // Check if entry already exists
+          // Only process the latest entry
+          const latestEntry = (parsedFeed.entries || []).reduce((acc: any, e: any) => {
+            if (!acc) return e
+            const da = new Date(acc.published_at || acc.updated || acc.date).getTime()
+            const db = new Date(e.published_at || e.updated || e.date).getTime()
+            return db > da ? e : acc
+          }, null as any)
+
+          if (latestEntry) {
+            const guidHash = generateGuidHash(latestEntry.guid, latestEntry.published_at)
             const { data: existingEntry } = await supabase
               .from('entries')
               .select('id')
               .eq('guid_hash', guidHash)
               .eq('subscription_id', subscription.id)
               .single()
-            
             if (!existingEntry) {
-              // Insert new entry
               const { error: insertError } = await supabase
                 .from('entries')
                 .insert({
                   subscription_id: subscription.id,
                   guid_hash: guidHash,
-                  title: feedEntry.title,
-                  content_html: feedEntry.content,
-                  published_at: feedEntry.published_at,
+                  title: latestEntry.title,
+                  content_html: latestEntry.content,
+                  published_at: latestEntry.published_at,
                   status: 'unread',
                   starred: false,
                   archived: false
                 })
-              
               if (insertError) {
                 console.error(`Error inserting entry: ${insertError.message}`)
               } else {
@@ -417,12 +417,12 @@ export default function SourcesPage() {
             <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Syncing...' : 'Sync Feeds'}
           </Button>
-          <AddSourceDialog onSuccess={loadSubscriptions}>
+          <AddFeedDialog onSuccess={loadSubscriptions}>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
-              Add Source
+              Add Feed
             </Button>
-          </AddSourceDialog>
+          </AddFeedDialog>
         </div>
       </div>
         
@@ -465,12 +465,12 @@ export default function SourcesPage() {
           <p className="text-muted-foreground mb-4">
             Add your first newsletter source to get started!
           </p>
-          <AddSourceDialog onSuccess={loadSubscriptions}>
+          <AddFeedDialog onSuccess={loadSubscriptions}>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
-              Add Source
+              Add Feed
             </Button>
-          </AddSourceDialog>
+          </AddFeedDialog>
         </div>
       ) : (
         <>

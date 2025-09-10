@@ -14,11 +14,13 @@ import {
   BarChart3,
   Calendar,
   Clock,
-  Image as ImageIcon
+  Image as ImageIcon,
+  RefreshCw
 } from 'lucide-react'
 import { getRelativeTime } from '@/lib/utils/content-utils'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { parseFeed, generateGuidHash } from '@/lib/services/feed-parser'
 
 interface SourceCardProps {
   subscription: {
@@ -101,21 +103,84 @@ export function SourceCard({ subscription, issueCount = 0, latestIssueDate, week
 
   const handleOpenLatestIssue = async () => {
     try {
-      // Get the latest entry for this subscription
-      const { data: latestEntry, error } = await supabase
+      // Load latest entry (basic fields only so it works on all schemas)
+      let { data: latestEntry, error } = await supabase
         .from('entries')
-        .select('id')
+        .select('id, guid, published_at')
         .eq('subscription_id', subscription.id)
         .order('published_at', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
 
+      // Fallback: if nothing returned, try created_at ordering (some feeds lack published_at)
       if (error || !latestEntry) {
-        toast.error('No issues found for this source')
+        const fb = await supabase
+          .from('entries')
+          .select('id, guid, published_at, created_at')
+          .eq('subscription_id', subscription.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        latestEntry = fb.data as any
+      }
+
+      if (!latestEntry) {
+        console.debug('DB lookup for latest entry failed or returned none. Falling back to parsing feed.', { error })
+        // Feed fallback
+        const parsed = await parseFeed(subscription.feed_url)
+        const items = (parsed.entries || []).sort((a: any, b: any) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
+        const first = items[0]
+        if (!first) {
+          // As a final fallback, navigate to Issues filtered by this source
+          router.push(`/issues?source=${encodeURIComponent(subscription.title)}&filter=all`)
+          return
+        }
+        const feedIdMatch = String(subscription.feed_url || '').match(/\/feeds\/([^.\/]+)(?:\.xml)?$/)
+        const feedId = feedIdMatch ? feedIdMatch[1] : null
+        const guidMatch = String(first.guid || '').match(/([^:]+)$/)
+        const entryId = guidMatch ? guidMatch[1] : null
+        const derived = feedId && entryId ? `https://kill-the-newsletter.com/feeds/${feedId}/entries/${entryId}.html` : null
+        const external = first.link || derived
+        if (external) {
+          window.open(external, '_blank', 'noopener,noreferrer')
+          return
+        }
+        // Final fallback: navigate to Issues filtered by this source
+        router.push(`/issues?source=${encodeURIComponent(subscription.title)}&filter=all`)
         return
       }
 
-      // Navigate to the latest entry detail page
+      // Try to fetch link in a separate call (schema-safe)
+      let directLink: string | null | undefined = null
+      try {
+        const { data: linkRow } = await supabase
+          .from('entries')
+          .select('link')
+          .eq('id', latestEntry.id)
+          .maybeSingle()
+        directLink = (linkRow as any)?.link
+      } catch (_) {
+        // ignore if column doesn't exist
+      }
+      if (directLink) {
+        const w = window.open(directLink, '_blank', 'noopener,noreferrer')
+        if (!w) router.push(`/issues/${latestEntry.id}`)
+        return
+      }
+
+      // Derive KTLN link if it's a KTLN feed
+      const feedIdMatch = String(subscription.feed_url || '').match(/\/feeds\/([^.\/]+)(?:\.xml)?$/)
+      const feedId = feedIdMatch ? feedIdMatch[1] : null
+      const guidMatch = String((latestEntry as any).guid || '').match(/([^:]+)$/)
+      const entryId = guidMatch ? guidMatch[1] : null
+      const derived = feedId && entryId ? `https://kill-the-newsletter.com/feeds/${feedId}/entries/${entryId}.html` : null
+      if (derived) {
+        const w = window.open(derived, '_blank', 'noopener,noreferrer')
+        if (!w) router.push(`/issues/${latestEntry.id}`)
+        return
+      }
+
+      // Fallback to in-app detail page
       router.push(`/issues/${latestEntry.id}`)
     } catch (error: any) {
       toast.error('Failed to open latest issue')
@@ -132,6 +197,7 @@ export function SourceCard({ subscription, issueCount = 0, latestIssueDate, week
   }
 
   const isPaused = subscription.status === 'paused'
+  const [syncing, setSyncing] = useState(false)
 
   return (
     <>
@@ -176,15 +242,111 @@ export function SourceCard({ subscription, issueCount = 0, latestIssueDate, week
                   </button>
                 </div>
                 
-                {/* Settings Button */}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="opacity-60 hover:opacity-100 transition-opacity"
-                >
-                  <Settings className="h-6 w-6" />
-                </Button>
+                {/* Sync newer (left) and Settings Button (right) */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={async () => {
+                      if (syncing) return
+                      setSyncing(true)
+                      try {
+                        const parsed = await parseFeed(subscription.feed_url)
+                        const entries = parsed.entries || []
+
+                        // Determine cutoff = latest stored published_at
+                        const { data: latestStored } = await supabase
+                          .from('entries')
+                          .select('published_at')
+                          .eq('subscription_id', subscription.id)
+                          .order('published_at', { ascending: false, nullsFirst: false })
+                          .limit(1)
+                          .maybeSingle()
+                        const cutoff = latestStored?.published_at ? new Date(latestStored.published_at).getTime() : null
+
+                        // Preload existing guid_hashes to avoid duplicates
+                        const { data: existingRows, error: existingErr } = await supabase
+                          .from('entries')
+                          .select('guid_hash')
+                          .eq('subscription_id', subscription.id)
+                        if (existingErr) throw new Error(existingErr.message)
+                        const existing = new Set<string>((existingRows || []).map((r: any) => r.guid_hash))
+
+                        let inserted = 0
+                        // Process from oldest to newest to maintain order; only items newer than cutoff
+                        const sorted = [...entries].sort((a: any, b: any) => new Date(a.published_at).getTime() - new Date(b.published_at).getTime())
+                        for (const item of sorted) {
+                          const guidHash = generateGuidHash(item.guid, item.published_at)
+                          if (existing.has(guidHash)) continue
+                          const publishedTs = new Date(item.published_at).getTime()
+                          if (cutoff !== null && !(publishedTs > cutoff)) continue
+
+                          // Build link if available (generic first, KTLN fallback)
+                          const fromLink = (item.link || '').match(/\/entries\/([A-Za-z0-9_-]+)\.html/)
+                          const feedIdMatch = String(subscription.feed_url || '').match(/\/feeds\/([^.\/]+)(?:\.xml)?$/)
+                          const guidMatch = String(item.guid || '').match(/([^:]+)$/)
+                          const entryId = fromLink ? fromLink[1] : (guidMatch ? guidMatch[1] : null)
+                          const feedId = feedIdMatch ? feedIdMatch[1] : null
+                          const derivedLink = feedId && entryId ? `https://kill-the-newsletter.com/feeds/${feedId}/entries/${entryId}.html` : null
+                          const link = item.link || derivedLink || null
+
+                          // Try insert with link column, fallback without if needed
+                          const attempt = await supabase
+                            .from('entries')
+                            .insert({
+                              subscription_id: subscription.id,
+                              guid_hash: guidHash,
+                              title: item.title,
+                              content_html: item.content,
+                              // @ts-ignore optional column
+                              link,
+                              published_at: item.published_at,
+                              status: 'unread',
+                              starred: false,
+                              archived: false
+                            })
+                          if (attempt.error) {
+                            const retry = await supabase
+                              .from('entries')
+                              .insert({
+                                subscription_id: subscription.id,
+                                guid_hash: guidHash,
+                                title: item.title,
+                                content_html: item.content,
+                                published_at: item.published_at,
+                                status: 'unread',
+                                starred: false,
+                                archived: false
+                              })
+                            if (retry.error) throw new Error(retry.error.message)
+                          }
+                          inserted++
+                          existing.add(guidHash)
+                        }
+                        toast.success(inserted > 0 ? `Synced ${inserted} new entr${inserted === 1 ? 'y' : 'ies'}` : 'No new entries')
+                        onUpdate()
+                      } catch (e: any) {
+                        toast.error(`Sync failed: ${e?.message || 'unknown error'}`)
+                      } finally {
+                        setSyncing(false)
+                      }
+                    }}
+                    className="opacity-60 hover:opacity-100 transition-opacity"
+                    title="Sync newer entries"
+                  >
+                    <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
+                  </Button>
+                  
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="opacity-60 hover:opacity-100 transition-opacity"
+                    title="Settings"
+                  >
+                    <Settings className="h-6 w-6" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
