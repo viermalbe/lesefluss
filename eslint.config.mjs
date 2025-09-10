@@ -16,7 +16,6 @@ const eslintConfig = [
       // TypeScript strict rules
       "@typescript-eslint/no-unused-vars": "error",
       "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/prefer-const": "error",
       
       // React 19 and modern practices
       "react/jsx-key": "error",

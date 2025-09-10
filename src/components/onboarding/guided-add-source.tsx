@@ -63,14 +63,13 @@ export function GuidedAddSource({ onSuccess, onSkip }: GuidedAddSourceProps) {
         feed: `https://kill-the-newsletter.com/feeds/${mockId}.xml`
       }
       
-      // Insert subscription into database
+      // Insert subscription into database (no ktln_email required)
       const { data: subscription, error } = await supabase
         .from('subscriptions')
         .insert({
           user_id: user.id,
           title: data.title,
           feed_url: ktlnResult.feed,
-          ktln_email: ktlnResult.email,
           status: 'active' as const,
         })
         .select()
@@ -80,7 +79,8 @@ export function GuidedAddSource({ onSuccess, onSkip }: GuidedAddSourceProps) {
         throw new Error(`Failed to create subscription: ${error.message}`)
       }
       
-      setGeneratedEmail(subscription.ktln_email)
+      // Show the generated email from the mock result on success
+      setGeneratedEmail(ktlnResult.email)
       setCurrentStep('success')
       toast.success('Newsletter-Quelle erfolgreich hinzugefügt!')
       
