@@ -108,6 +108,22 @@ export async function POST(request: NextRequest) {
         console.log(`🌐 Using base URL: ${baseUrl || 'relative'}`)
         
         const parsedFeed = await parseFeed(subscription.feed_url, baseUrl)
+        const fetchMode = baseUrl ? 'direct' : 'proxy'
+        const latestPublishedAt = parsedFeed.entries.length
+          ? parsedFeed.entries.reduce((max, e) => {
+              const t = new Date(e.published_at).getTime()
+              return t > max ? t : max
+            }, 0)
+          : null
+
+        // DB diagnostic: what's the latest published_at we already have?
+        const { data: latestDbEntry } = await supabase
+          .from('entries')
+          .select('published_at')
+          .eq('subscription_id', subscription.id)
+          .order('published_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
         
         let syncedEntries = 0
         
@@ -193,7 +209,10 @@ export async function POST(request: NextRequest) {
         results.push({
           subscription: subscription.title,
           entries_synced: syncedEntries,
-          total_entries: parsedFeed.entries.length
+          total_entries: parsedFeed.entries.length,
+          latest_published_at: latestPublishedAt ? new Date(latestPublishedAt).toISOString() : null,
+          db_latest_published_at: latestDbEntry?.published_at || null,
+          fetch_mode: fetchMode
         })
         
         console.log(`Synced ${syncedEntries} new entries for ${subscription.title}`)
