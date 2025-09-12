@@ -23,12 +23,19 @@ export async function parseFeed(feedUrl: string, baseUrl?: string): Promise<Pars
     
     if (baseUrl) {
       // Cron job context: fetch feed directly to avoid self-referencing API calls
-      console.log(`🔗 Direct fetch: ${feedUrl}`)
-      const response = await fetch(feedUrl, {
+      // Add a cache-busting query parameter to defeat intermediary caches
+      const urlObj = new URL(feedUrl)
+      urlObj.searchParams.set('_', Date.now().toString())
+      const directUrl = urlObj.toString()
+      console.log(`🔗 Direct fetch: ${directUrl}`)
+      const response = await fetch(directUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; Lesefluss/1.0; +https://lesefluss.app/bot)',
           'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'Accept-Language': 'en-US,en;q=0.9'
         }
       })
       
