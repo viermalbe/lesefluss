@@ -53,6 +53,19 @@ jobs:
                 "📝 " + .message
               end
             ' 2>/dev/null || echo "📝 $body"
+
+            # Detailed diagnostics per subscription
+            echo "\n🔎 Per-subscription diagnostics:" 
+            echo "$body" | jq -r '
+              .results[] | 
+              "- " + (.subscription // "<unknown>") +
+              ": synced=" + ((.entries_synced // 0) | tostring) +
+              ", candidates=" + ((.new_candidates // 0) | tostring) +
+              ", insert_errors=" + ((.insert_errors // 0) | tostring) +
+              (if (.insert_error_messages_sample | length) > 0 then
+                 "\n    errors: " + (.insert_error_messages_sample | join(" | "))
+               else "" end)
+            ' 2>/dev/null || true
             
           else
             echo "❌ Feed sync failed with status $http_code"

@@ -177,6 +177,7 @@ export async function POST(request: NextRequest) {
                 guid_hash: guidHash,
                 title: feedEntry.title,
                 content_html: feedEntry.content,
+                // @ts-ignore optional column in some schemas
                 link: resolvedLink,
                 published_at: feedEntry.published_at,
                 status: 'unread',
@@ -185,8 +186,27 @@ export async function POST(request: NextRequest) {
               })
 
             if (insertError) {
-              console.error(`Error inserting entry: ${insertError.message}`)
+              console.error(`Error inserting entry (with link): ${insertError.message}`)
               insertErrors.push(insertError.message)
+              // Retry without link field to be compatible with older DB schema
+              const { error: retryError } = await supabase
+                .from('entries')
+                .insert({
+                  subscription_id: subscription.id,
+                  guid_hash: guidHash,
+                  title: feedEntry.title,
+                  content_html: feedEntry.content,
+                  published_at: feedEntry.published_at,
+                  status: 'unread',
+                  starred: false,
+                  archived: false
+                })
+              if (retryError) {
+                console.error(`Retry insert (without link) failed: ${retryError.message}`)
+                insertErrors.push(retryError.message)
+              } else {
+                syncedEntries++
+              }
             } else {
               syncedEntries++
             }
@@ -217,6 +237,7 @@ export async function POST(request: NextRequest) {
           entries_synced: syncedEntries,
           new_candidates: newCandidates,
           insert_errors: insertErrors.length,
+          insert_error_messages_sample: insertErrors.slice(0, 3),
           total_entries: parsedFeed.entries.length,
           latest_published_at: latestPublishedAt ? new Date(latestPublishedAt).toISOString() : null,
           db_latest_published_at: latestDbEntry?.published_at || null,
