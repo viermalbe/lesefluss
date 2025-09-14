@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { parseFeed, generateGuidHash } from '@/lib/services/feed-parser'
+import { parseFeed, generateGuidHash } from '@/lib/services/feed-parser-server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -126,6 +126,8 @@ export async function POST(request: NextRequest) {
           .maybeSingle()
         
         let syncedEntries = 0
+        let newCandidates = 0
+        let insertErrors: string[] = []
         
         // Process each entry in the feed
         for (const feedEntry of parsedFeed.entries) {
@@ -153,7 +155,9 @@ export async function POST(request: NextRequest) {
             : null
           const resolvedLink = feedEntry.link || derivedLink || null
           // Generate a hash for the GUID to ensure uniqueness
-          const guidHash = generateGuidHash(feedEntry.guid, feedEntry.published_at)
+          // Prefer hashing the GUID when present to avoid collisions; fallback to title+published
+          const guidSource = feedEntry.guid || `${feedEntry.title}`
+          const guidHash = generateGuidHash(guidSource, feedEntry.published_at)
           
           // Check if entry already exists
           const { data: existingEntry } = await supabase
@@ -165,6 +169,7 @@ export async function POST(request: NextRequest) {
           
           if (!existingEntry) {
             // Insert new entry
+            newCandidates++
             const { error: insertError } = await supabase
               .from('entries')
               .insert({
@@ -181,6 +186,7 @@ export async function POST(request: NextRequest) {
 
             if (insertError) {
               console.error(`Error inserting entry: ${insertError.message}`)
+              insertErrors.push(insertError.message)
             } else {
               syncedEntries++
             }
@@ -209,6 +215,8 @@ export async function POST(request: NextRequest) {
         results.push({
           subscription: subscription.title,
           entries_synced: syncedEntries,
+          new_candidates: newCandidates,
+          insert_errors: insertErrors.length,
           total_entries: parsedFeed.entries.length,
           latest_published_at: latestPublishedAt ? new Date(latestPublishedAt).toISOString() : null,
           db_latest_published_at: latestDbEntry?.published_at || null,
