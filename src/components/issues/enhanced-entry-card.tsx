@@ -382,11 +382,12 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
   return (
     <Card
       className={cn(
-        entry.status === 'unread' ? 'border-primary' : 'border-border'
+        'group cursor-pointer select-none transition-transform duration-150 ease-out hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+        entry.status === 'unread' ? 'border-primary/70' : 'border-border'
       )}
       onClick={handleCardClick}
     >
-      <CardContent className="relative">
+      <CardContent className="relative transition-colors duration-150 group-hover:bg-muted/40">
         {/* Action Icons - Top right corner */}
         <div className="absolute -top-2 right-4 flex gap-1 z-10">
 
@@ -433,7 +434,7 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
         {/* Main Content Layout */}
         <div className="flex gap-3 mb-0">
           {/* Preview Image - 64x64 */}
-          <div className="w-12 h-12 overflow-hidden flex-shrink-0 rounded-md">
+          <div className="w-12 h-12 overflow-hidden flex-shrink-0 rounded-md ring-1 ring-border/50 group-hover:ring-primary/30 transition-colors">
             <OptimizedImage 
               src={entry.subscription.image_url || getFirstImageFromHtml(entry.content_html)}
               alt={entry.title}
@@ -449,7 +450,7 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
               {entry.subscription.title}
             </div>
             
-            <h3 className={`text-base line-clamp-2 leading-tight ${
+            <h3 className={`text-base line-clamp-2 leading-tight transition-colors ${
               entry.status === 'read' ? 'text-muted-foreground' : 'text-foreground font-medium'
             }`} data-component-name="EnhancedEntryCard">
               {entry.title}

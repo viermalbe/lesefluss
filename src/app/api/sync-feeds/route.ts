@@ -186,8 +186,15 @@ export async function POST(request: NextRequest) {
               })
 
             if (insertError) {
-              console.error(`Error inserting entry (with link): ${insertError.message}`)
-              insertErrors.push(insertError.message)
+              const msg = insertError.message || ''
+              if (msg.includes('duplicate key value')) {
+                // Idempotent: already exists due to (subscription_id, guid_hash) unique constraint
+                // Do not treat as an error; simply skip counting as synced
+                console.warn(`Duplicate entry skipped (with link): ${msg}`)
+              } else {
+                console.error(`Error inserting entry (with link): ${msg}`)
+                insertErrors.push(msg)
+              }
               // Retry without link field to be compatible with older DB schema
               const { error: retryError } = await supabase
                 .from('entries')
@@ -202,8 +209,13 @@ export async function POST(request: NextRequest) {
                   archived: false
                 })
               if (retryError) {
-                console.error(`Retry insert (without link) failed: ${retryError.message}`)
-                insertErrors.push(retryError.message)
+                const rmsg = retryError.message || ''
+                if (rmsg.includes('duplicate key value')) {
+                  console.warn(`Duplicate entry skipped (retry without link): ${rmsg}`)
+                } else {
+                  console.error(`Retry insert (without link) failed: ${rmsg}`)
+                  insertErrors.push(rmsg)
+                }
               } else {
                 syncedEntries++
               }
