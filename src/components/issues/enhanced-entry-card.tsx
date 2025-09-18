@@ -43,13 +43,13 @@ interface EnhancedEntryCardProps {
 const getFirstImageFromHtml = (html: string): string | null => {
   const imgMatches = html.match(/<img[^>]+src="([^"]+)"[^>]*>/gi)
   if (!imgMatches) return null
-  
+
   for (const imgTag of imgMatches) {
     const srcMatch = imgTag.match(/src="([^"]+)"/i)
     if (!srcMatch) continue
-    
+
     const src = srcMatch[1]
-    
+
     // Skip common tracking pixel patterns
     if (
       src.includes('track') ||
@@ -62,7 +62,7 @@ const getFirstImageFromHtml = (html: string): string | null => {
     ) {
       continue
     }
-    
+
     // Skip very small images (likely tracking)
     const widthMatch = imgTag.match(/width=["']?(\d+)/i)
     const heightMatch = imgTag.match(/height=["']?(\d+)/i)
@@ -71,10 +71,10 @@ const getFirstImageFromHtml = (html: string): string | null => {
       const height = parseInt(heightMatch[1])
       if (width < 50 || height < 50) continue
     }
-    
+
     return src
   }
-  
+
   return null
 }
 
@@ -174,70 +174,70 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
           if (data?.link) {
             linkCache.set(entry.id, data.link)
             // Persist for future speed
-            try { await supabase.from('entries').update({ link: data.link }).eq('id', entry.id) } catch {}
+            try { await supabase.from('entries').update({ link: data.link }).eq('id', entry.id) } catch { }
             window.open(data.link, '_blank', 'noopener,noreferrer')
             if (isUnread) {
               if (onToggleReadStatus) onToggleReadStatus(entry.id, 'read')
-              try { await supabase.from('entries').update({ status: 'read' }).eq('id', entry.id) } catch {}
+              try { await supabase.from('entries').update({ status: 'read' }).eq('id', entry.id) } catch { }
             }
             return
           }
         }
       }
-    } catch {}
+    } catch { }
     // Final: no navigation if we still cannot resolve
     toast.error('No external link found for this entry')
   }
 
   const handleToggleRead = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    
+
     try {
       // Berechne den neuen Status
       const newStatus = entry.status === 'read' ? 'unread' : 'read'
-      
+
       // Bereite die Daten für das Update vor
       const updateData: { status: 'read' | 'unread'; archived?: boolean } = { status: newStatus }
-      
+
       // Wenn ein Eintrag auf ungelesen gesetzt wird und archiviert ist, entferne den Archiv-Status
       if (newStatus === 'unread' && entry.archived) {
         updateData.archived = false
       }
-      
+
       // OPTIMISTISCHE UI-AKTUALISIERUNG: Zuerst die Callbacks aufrufen, um die UI sofort zu aktualisieren
-      
+
       // 1. Status aktualisieren
       if (onToggleReadStatus) {
         onToggleReadStatus(entry.id, newStatus)
       }
-      
+
       // 2. Wenn sich der Archiv-Status ändert (beim Setzen auf ungelesen)
       if (newStatus === 'unread' && entry.archived && onToggleArchived) {
         onToggleArchived(entry.id, false)
       }
-      
+
       // Danach die API-Anfrage senden
       const { error } = await supabase
         .from('entries')
         .update(updateData)
         .eq('id', entry.id)
-      
+
       if (error) {
         // Bei Fehler: Fehlermeldung anzeigen und UI-Update rückgängig machen
         toast.error(`Failed to update status: ${error.message}`)
-        
+
         // UI-Update rückgängig machen
         if (onToggleReadStatus) {
           onToggleReadStatus(entry.id, entry.status) // Zurück zum ursprünglichen Wert
         }
-        
+
         if (newStatus === 'unread' && entry.archived && onToggleArchived) {
           onToggleArchived(entry.id, true) // Archiv-Status wiederherstellen
         }
-        
+
         return
       }
-      
+
       // Erfolgreiche Aktualisierung - keine Toast-Nachricht für Statusänderungen
       // Wenn ein Eintrag auf ungelesen gesetzt wurde und archiviert war, zeige Nachricht
       if (newStatus === 'unread' && entry.archived) {
@@ -250,31 +250,31 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
 
   const handleToggleStarred = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    
+
     try {
       // Berechne den neuen Like-Status
       const newStarred = !entry.starred
-      
+
       // Bereite die Daten für das Update vor
       const updateData: { starred: boolean; archived?: boolean } = { starred: newStarred }
-      
+
       // Wenn ein Eintrag geliked wird und archiviert ist, entferne den Archiv-Status
       if (newStarred && entry.archived) {
         updateData.archived = false
       }
-      
+
       // OPTIMISTISCHE UI-AKTUALISIERUNG: Zuerst die Callbacks aufrufen, um die UI sofort zu aktualisieren
-      
+
       // 1. Like-Status aktualisieren
       if (onToggleStarred) {
         onToggleStarred(entry.id, newStarred)
       }
-      
+
       // 2. Wenn sich der Archiv-Status ändert (beim Liken eines archivierten Eintrags)
       if (newStarred && entry.archived && onToggleArchived) {
         onToggleArchived(entry.id, false)
       }
-      
+
       // Danach die API-Anfrage senden
       const { error } = await supabase
         .from('entries')
@@ -284,22 +284,22 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
       if (error) {
         // Bei Fehler: Fehlermeldung anzeigen und UI-Update rückgängig machen
         toast.error(`Failed to ${entry.starred ? 'unstar' : 'star'} issue: ${error.message}`)
-        
+
         // UI-Update rückgängig machen
         if (onToggleStarred) {
           onToggleStarred(entry.id, entry.starred) // Zurück zum ursprünglichen Wert
         }
-        
+
         if (newStarred && entry.archived && onToggleArchived) {
           onToggleArchived(entry.id, true) // Archiv-Status wiederherstellen
         }
-        
+
         return
       }
 
       // Erfolgreiche Aktualisierung
       toast.success(`Issue ${entry.starred ? 'unstarred' : 'starred'} successfully`)
-      
+
       // Wenn ein Eintrag geliked wurde und archiviert war, zeige zusätzliche Nachricht
       if (newStarred && entry.archived) {
         toast.success('Issue removed from archive')
@@ -311,41 +311,41 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
 
   const handleToggleArchived = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    
+
     try {
       // Berechne den neuen Archiv-Status
       const newArchived = !entry.archived
-      
+
       // Bereite die Daten für das Update vor
-      const updateData: { 
-        archived: boolean; 
-        starred?: boolean; 
-        status?: 'read' | 'unread' 
+      const updateData: {
+        archived: boolean;
+        starred?: boolean;
+        status?: 'read' | 'unread'
       } = { archived: newArchived }
-      
+
       // Wenn ein Eintrag archiviert wird, setze auch den Status auf "read" und entferne den Like-Status
       if (newArchived) {
         updateData.status = 'read'
         updateData.starred = false
       }
-      
+
       // OPTIMISTISCHE UI-AKTUALISIERUNG: Zuerst die Callbacks aufrufen, um die UI sofort zu aktualisieren
-      
+
       // 1. Archiv-Status aktualisieren
       if (onToggleArchived) {
         onToggleArchived(entry.id, newArchived)
       }
-      
+
       // 2. Wenn sich der Like-Status ändert (beim Archivieren wird Like entfernt)
       if (newArchived && entry.starred && onToggleStarred) {
         onToggleStarred(entry.id, false)
       }
-      
+
       // 3. Wenn sich der Lese-Status ändert (beim Archivieren wird Status auf "read" gesetzt)
       if (newArchived && entry.status !== 'read' && onToggleReadStatus) {
         onToggleReadStatus(entry.id, 'read')
       }
-      
+
       // Danach die API-Anfrage senden
       const { error } = await supabase
         .from('entries')
@@ -355,23 +355,23 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
       if (error) {
         // Bei Fehler: Fehlermeldung anzeigen und UI-Update rückgängig machen
         toast.error(`Failed to ${entry.archived ? 'unarchive' : 'archive'} issue: ${error.message}`)
-        
+
         // UI-Update rückgängig machen
         if (onToggleArchived) {
           onToggleArchived(entry.id, entry.archived) // Zurück zum ursprünglichen Wert
         }
-        
+
         if (newArchived && entry.starred && onToggleStarred) {
           onToggleStarred(entry.id, true) // Like-Status wiederherstellen
         }
-        
+
         if (newArchived && entry.status !== 'read' && onToggleReadStatus) {
           onToggleReadStatus(entry.id, entry.status) // Lese-Status wiederherstellen
         }
-        
+
         return
       }
-      
+
       // Erfolgreiche Aktualisierung
       toast.success(`Issue ${entry.archived ? 'unarchived' : 'archived'} successfully`)
     } catch (error: any) {
@@ -387,17 +387,16 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
       )}
       onClick={handleCardClick}
     >
-      <CardContent className="relative transition-colors duration-150 group-hover:bg-muted/40">
+      <CardContent className="relative transition-colors duration-150">
         {/* Action Icons - Top right corner */}
-        <div className="absolute -top-2 right-4 flex gap-1 z-10">
+        <div className="absolute -top-4 right-2 flex gap-2 z-50">
 
-          
+
           {/* Read/Unread Status Icon */}
           <button
             onClick={handleToggleRead}
-            className={`rounded-md p-1 hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors ${
-              isUnread ? 'text-primary' : 'text-muted-foreground'
-            }`}
+            className={`rounded-md p-1 hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors ${isUnread ? 'text-primary' : 'text-muted-foreground'
+              }`}
             title={isUnread ? 'Mark as read' : 'Mark as unread'}
           >
             {isUnread ? (
@@ -407,27 +406,25 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
             )}
             <span className="sr-only">{isUnread ? 'New' : 'Opened'}</span>
           </button>
-                    {/* Archive Icon */}
-                    <button
-            onClick={handleToggleArchived}
-            className={`rounded-md p-1 hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors ${
-              entry.archived ? 'text-primary' : 'text-muted-foreground'
-            }`}
-            title={entry.archived ? 'Unarchive' : 'Archive'}
-          >
-            <Archive className="w-4 h-4" />
-          </button>
+
           {/* Heart Icon for Favorites */}
           <button
             onClick={handleToggleStarred}
-            className={`rounded-md p-1 hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors ${
-              entry.starred ? 'text-primary' : 'text-muted-foreground'
-            }`}
+            className={`rounded-md p-1 hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors ${entry.starred ? 'text-primary' : 'text-muted-foreground'
+              }`}
             title={entry.starred ? 'Remove from favorites' : 'Add to favorites'}
           >
-            <Heart className={`w-4 h-4 ${
-              entry.starred ? 'fill-primary dark:fill-primary' : ''
-            }`} />
+            <Heart className={`w-4 h-4 ${entry.starred ? 'fill-primary dark:fill-primary' : ''
+              }`} />
+          </button>
+          {/* Archive Icon */}
+          <button
+            onClick={handleToggleArchived}
+            className={`rounded-md p-1 hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors ${entry.archived ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            title={entry.archived ? 'Unarchive' : 'Archive'}
+          >
+            <Archive className="w-4 h-4" />
           </button>
         </div>
 
@@ -435,24 +432,23 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
         <div className="flex gap-3 mb-0">
           {/* Preview Image - 64x64 */}
           <div className="w-12 h-12 overflow-hidden flex-shrink-0 rounded-md ring-1 ring-border/50 group-hover:ring-primary/30 transition-colors">
-            <OptimizedImage 
+            <OptimizedImage
               src={entry.subscription.image_url || getFirstImageFromHtml(entry.content_html)}
               alt={entry.title}
               className="w-full h-full object-contain"
               sourceId={entry.subscription.id}
             />
           </div>
-          
+
           {/* Content - Source and Title */}
           <div className="flex-1 min-w-0" data-component-name="EnhancedEntryCard">
-            
+
             <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1" data-component-name="EnhancedEntryCard">
               {entry.subscription.title}
             </div>
-            
-            <h3 className={`text-base line-clamp-2 leading-tight transition-colors ${
-              entry.status === 'read' ? 'text-muted-foreground' : 'text-foreground font-medium'
-            }`} data-component-name="EnhancedEntryCard">
+
+            <h3 className={`text-base line-clamp-2 leading-tight transition-colors ${entry.status === 'read' ? 'text-muted-foreground' : 'text-foreground font-medium'
+              }`} data-component-name="EnhancedEntryCard">
               {entry.title}
             </h3>
           </div>
@@ -460,7 +456,7 @@ export function EnhancedEntryCard({ entry, onToggleReadStatus, onToggleStarred, 
 
         {/* Meta Information Row */}
         <div className="space-y-3">
-          
+
           {/* Meta Information */}
           <div className="flex items-center pt-4" data-component-name="EnhancedEntryCard">
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
